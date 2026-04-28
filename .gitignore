@@ -1,0 +1,46 @@
+# Go
+/backend/bin/
+/backend/tmp/
+/backend/server
+*.test
+*.out
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Vite
+/web/dist/
+/web/tsconfig*.tsbuildinfo
+
+# Embedded frontend output copied into backend
+/backend/internal/web/dist/
+
+# Runtime data
+/data/
+/backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Env
+.env
+.env.local
+
+# Server config (contains admin credentials)
+/backend/config.yaml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Wrangler
+.wrangler/
+worker/dist/

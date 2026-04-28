@@ -1,0 +1,12 @@
+name = "cf-email-relay"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+workers_dev = false
+
+# Secrets (set via `wrangler secret put`):
+#   INGEST_SECRET  - shared HMAC key with backend
+#   INGEST_URL     — https://mail.example.com/ingest/email
+#
+# This Worker has no routes or triggers defined here —
+# attach it as an Email Routing destination in the Cloudflare dashboard
+# for each domain you want to receive mail for.
