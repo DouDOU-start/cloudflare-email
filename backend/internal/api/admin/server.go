@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db/gen"
 	"github.com/cf-email/backend/internal/storage"
 	"github.com/go-chi/chi/v5"
@@ -15,11 +16,10 @@ type Server struct {
 	Queries        *gen.Queries
 	DB             *sql.DB
 	Storage        storage.Store
+	Config         *config.Store
 	Logger         *slog.Logger
 	SessionSecret  string
 	PublicBaseURL  string
-	AdminUsername  string // from config.yaml admin.username
-	AdminPassword  string // from config.yaml admin.password (plaintext)
 	TurnstileKey   string // optional
 	TurnstileSite  string // optional
 	CookieInsecure bool   // true only in local dev over HTTP
@@ -45,6 +45,8 @@ func (s *Server) Routes() http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(s.RequireSession)
 		r.Get("/me", s.handleMe)
+		r.Get("/system-config", s.handleGetSystemConfig)
+		r.Patch("/system-config", s.handleUpdateSystemConfig)
 
 		r.Get("/mailboxes", s.handleListMailboxes)
 		r.Post("/mailboxes", s.handleCreateMailbox)

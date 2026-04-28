@@ -22,6 +22,12 @@ const I = {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   ),
+  config: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.51a2 2 0 0 1 1-1.72l.15-.1a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
   logo: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="5" width="18" height="14" rx="1" />
@@ -40,6 +46,7 @@ const I = {
 const NAV: { to: string; label: string; icon: ReactNode; end?: boolean }[] = [
   { to: "/admin", label: "邮箱", icon: I.inbox, end: true },
   { to: "/admin/tokens", label: "访问链接", icon: I.link },
+  { to: "/admin/system-config", label: "系统配置", icon: I.config },
 ];
 
 export default function AdminLayout() {
@@ -149,7 +156,7 @@ function Brand({ compact }: { compact?: boolean }) {
         </div>
       </div>
       <div>
-        <div className={cn("font-display font-black tracking-[-0.06em] text-sidebar-foreground-strong md:text-card", compact ? "text-2xl text-foreground" : "text-3xl")}>cf-email</div>
+        <div className={cn("font-display font-black tracking-[-0.04em] text-sidebar-foreground-strong md:text-card", compact ? "text-2xl text-foreground" : "whitespace-nowrap text-[21px] leading-none")}>Cloudflare Email</div>
       </div>
     </div>
   );

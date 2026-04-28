@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -12,12 +13,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db/gen"
 	mimex "github.com/cf-email/backend/internal/mime"
 	"github.com/cf-email/backend/internal/storage"
 )
 
 type Handler struct {
+	Config  *config.Store
 	Secret  string
 	Queries *gen.Queries
 	DB      *sql.DB
@@ -29,6 +32,13 @@ const hardReadCap = 25 * 1024 * 1024
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	cfg := h.Config.Snapshot()
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+cfg.IngestToken)) != 1 {
+		h.Logger.Warn("ingest bad token", "ip", r.RemoteAddr)
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, hardReadCap+1))
 	if err != nil {

@@ -54,6 +54,7 @@ BIND_ADDR=:8080
 PUBLIC_BASE_URL=https://mail.example.com
 DB_PATH=./data/email.db
 STORAGE_DIR=./data/storage
+INGEST_TOKEN=<worker-bearer-token>
 INGEST_SECRET=<shared-worker-secret>
 SESSION_SECRET=<session-cookie-secret>
 ADMIN_USERNAME=admin
@@ -65,6 +66,7 @@ TURNSTILE_SECRET_KEY=
 Important production values:
 
 - `PUBLIC_BASE_URL` must match the public HTTPS origin that serves the backend.
+- `INGEST_TOKEN` must be identical in the backend config and Worker secret.
 - `INGEST_SECRET` must be identical in the backend config and Worker secret.
 - `SESSION_SECRET` should be a long random value and stable across restarts.
 - `ADMIN_PASSWORD` is stored in config as plaintext in the current implementation, so protect config file access.
@@ -87,6 +89,7 @@ Run the Worker deploy after setting secrets:
 
 ```bash
 cd worker
+npx wrangler secret put INGEST_TOKEN
 npx wrangler secret put INGEST_SECRET
 npx wrangler secret put INGEST_URL
 npx wrangler deploy

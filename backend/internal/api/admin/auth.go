@@ -71,9 +71,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Constant-time compare against config-provided credentials.
-	userOK := subtle.ConstantTimeCompare([]byte(req.Username), []byte(s.AdminUsername)) == 1
-	passOK := subtle.ConstantTimeCompare([]byte(req.Password), []byte(s.AdminPassword)) == 1
+	cfg := s.Config.Snapshot()
+	userOK := subtle.ConstantTimeCompare([]byte(req.Username), []byte(cfg.AdminUsername)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(req.Password), []byte(cfg.AdminPassword)) == 1
 	if !userOK || !passOK {
 		s.recordAttempt(ctx, ip, req.Username, false)
 		httpapi.WriteJSON(w, http.StatusUnauthorized, httpapi.Error{Error: "用户名或密码错误"})
@@ -87,7 +87,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	auth.SetSessionCookie(w, cookie, exp, s.secureCookie())
 
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
-		"username":  s.AdminUsername,
+		"username":  cfg.AdminUsername,
 		"expiresAt": exp.Unix(),
 	})
 }
@@ -106,8 +106,9 @@ func (s *Server) handleContext(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, _ *http.Request) {
+	cfg := s.Config.Snapshot()
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
-		"username": s.AdminUsername,
+		"username": cfg.AdminUsername,
 	})
 }
 

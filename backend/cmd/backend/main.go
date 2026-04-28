@@ -42,6 +42,8 @@ func main() {
 	defer conn.Close()
 	logger.Info("db ready", "path", cfg.DBPath)
 
+	cfgStore := config.NewStore(cfg)
+
 	store, err := storage.NewFS(cfg.StorageDir)
 	if err != nil {
 		logger.Error("storage init failed", "err", err)
@@ -49,6 +51,7 @@ func main() {
 	}
 
 	ingestHandler := &ingest.Handler{
+		Config:  cfgStore,
 		Secret:  cfg.IngestSecret,
 		Queries: queries,
 		DB:      conn,
@@ -60,11 +63,10 @@ func main() {
 		Queries:        queries,
 		DB:             conn,
 		Storage:        store,
+		Config:         cfgStore,
 		Logger:         logger,
 		SessionSecret:  cfg.SessionSecret,
 		PublicBaseURL:  cfg.PublicBaseURL,
-		AdminUsername:  cfg.AdminUsername,
-		AdminPassword:  cfg.AdminPassword,
 		TurnstileKey:   cfg.TurnstileSecret,
 		TurnstileSite:  cfg.TurnstileSite,
 		CookieInsecure: os.Getenv("DEV_INSECURE_COOKIE") == "1",

@@ -4,6 +4,7 @@ compatibility_date = "2024-12-01"
 workers_dev = false
 
 # Secrets (set via `wrangler secret put`):
+#   INGEST_TOKEN   - bearer token required by backend
 #   INGEST_SECRET  - shared HMAC key with backend
 #   INGEST_URL     — https://mail.example.com/ingest/email
 #

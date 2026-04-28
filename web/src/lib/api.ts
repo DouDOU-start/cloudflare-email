@@ -94,6 +94,17 @@ export interface Token {
   url?: string;
 }
 
+export interface SystemConfig {
+  ingest_token: string;
+  admin_username: string;
+  admin_password_set: boolean;
+  editable: {
+    ingest_token: boolean;
+    admin_username: boolean;
+    admin_password: boolean;
+  };
+}
+
 export interface Paged<T> {
   items: T[];
   total: number;

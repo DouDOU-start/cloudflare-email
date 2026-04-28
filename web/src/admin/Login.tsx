@@ -57,7 +57,7 @@ export default function Login() {
 
         <Panel className="flex flex-col justify-center p-6 md:p-8">
           <div className="mb-8">
-            <div className="font-mono-display text-xs font-bold uppercase tracking-[0.18em] text-accent">cf-email console</div>
+            <div className="font-mono-display text-xs font-bold uppercase tracking-[0.18em] text-accent">Cloudflare Email</div>
             <h2 className="mt-3 font-display text-5xl font-black tracking-[-0.065em]">登录</h2>
             <p className="mt-3 text-[14px] leading-6 text-muted-foreground">输入管理员凭据进入控制台。</p>
           </div>

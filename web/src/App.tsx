@@ -5,6 +5,7 @@ import Mailboxes from "./admin/Mailboxes";
 import MailboxDetail from "./admin/MailboxDetail";
 import MessageDetail from "./admin/MessageDetail";
 import Tokens from "./admin/Tokens";
+import SystemConfig from "./admin/SystemConfig";
 import Viewer from "./viewer/Viewer";
 import ViewerMessage from "./viewer/ViewerMessage";
 
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="mailboxes/:id" element={<MailboxDetail />} />
         <Route path="messages/:id" element={<MessageDetail />} />
         <Route path="tokens" element={<Tokens />} />
+        <Route path="system-config" element={<SystemConfig />} />
       </Route>
       <Route path="/v/:token" element={<Viewer />} />
       <Route path="/v/:token/messages/:id" element={<ViewerMessage />} />

@@ -3,13 +3,17 @@
 # Override CONFIG_PATH env var if you want a different location.
 # Individual fields can also be overridden by env vars
 # (BIND_ADDR, PUBLIC_BASE_URL, DB_PATH, STORAGE_DIR,
-#  INGEST_SECRET, SESSION_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD,
+#  INGEST_TOKEN, INGEST_SECRET, SESSION_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD,
 #  TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY).
 
 bind_addr: ":8080"
 public_base_url: "http://localhost:8080"
 db_path: "./data/email.db"
 storage_dir: "./data/storage"
+
+# Bearer token required before accepting Worker ingest requests.
+# Must match the Worker's INGEST_TOKEN.
+ingest_token: "change-me-token"
 
 # Shared secret used to sign requests from the Cloudflare Worker.
 # Must match the Worker's INGEST_SECRET.

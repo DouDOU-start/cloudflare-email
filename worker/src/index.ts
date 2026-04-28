@@ -1,4 +1,5 @@
 interface Env {
+  INGEST_TOKEN: string;
   INGEST_SECRET: string;
   INGEST_URL: string;
 }
@@ -53,6 +54,7 @@ export default {
     const res = await fetch(env.INGEST_URL, {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${env.INGEST_TOKEN}`,
         "Content-Type": "message/rfc822",
         "X-Timestamp": ts,
         "X-Signature": sig,
