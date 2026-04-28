@@ -89,9 +89,6 @@ export default function AdminLayout() {
       <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 border-r-2 border-sidebar-border bg-sidebar text-sidebar-foreground md:flex md:flex-col">
         <div className="border-b-2 border-sidebar-border p-5">
           <Brand />
-          <div className="mt-5 border border-sidebar-border bg-sidebar-muted px-3 py-2 font-mono-display text-[11px] uppercase tracking-[0.14em] text-sidebar-foreground/70">
-            inbound control desk
-          </div>
         </div>
 
         <nav className="flex-1 space-y-2 p-4">
@@ -125,7 +122,6 @@ export default function AdminLayout() {
             </div>
             <div className="min-w-0">
               <div className="truncate font-semibold text-sidebar-foreground-strong">{me.data?.username}</div>
-              <div className="font-mono-display text-[10px] uppercase tracking-[0.14em] text-sidebar-foreground/55">operator</div>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={logout} className="w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground-strong">
@@ -154,7 +150,6 @@ function Brand({ compact }: { compact?: boolean }) {
       </div>
       <div>
         <div className={cn("font-display font-black tracking-[-0.06em] text-sidebar-foreground-strong md:text-card", compact ? "text-2xl text-foreground" : "text-3xl")}>cf-email</div>
-        <div className="font-mono-display text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground md:text-sidebar-foreground/55">mail sorting console</div>
       </div>
     </div>
   );
