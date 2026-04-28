@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, pagingQuery, type Mailbox, type MessageSummary, type Paged } from "@/lib/api";
 import { Button, DataTable, Dot, EmptyState, Field, Input, Metric, Pagination, Panel, Select, tableCellClass, tableHeadClass, tableHeaderCellClass, tableRowClass, Toolbar } from "@/components/ui";
-import { formatRelative } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -105,8 +105,8 @@ export default function Mailboxes() {
 
       {mailboxesQuery.data && mailboxesQuery.data.length > 0 && (!isMessageView || messagesQuery.data) && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <Toolbar className="shrink-0">
-            <div className="flex flex-wrap gap-2">
+          <Toolbar className="shrink-0" contentClassName="md:grid md:grid-cols-3 md:items-end md:gap-4">
+            <div className="flex flex-wrap gap-2 md:self-end">
               <Button type="button" variant={isMessageView ? "primary" : "secondary"} onClick={() => setMode("messages")}>
                 全部邮件
               </Button>
@@ -114,7 +114,7 @@ export default function Mailboxes() {
                 邮箱分组
               </Button>
             </div>
-            <div className="grid flex-1 gap-3 md:grid-cols-[minmax(220px,1fr)_160px]">
+            <div className="grid gap-3 md:col-span-2 md:grid-cols-[minmax(220px,1fr)_160px]">
               <Field label="模糊搜索" className="space-y-1.5">
                 <Input
                   value={query}
@@ -175,7 +175,7 @@ export default function Mailboxes() {
                             {mailbox?.address ?? m.to_addr}
                           </Link>
                         </td>
-                        <td className={`${tableCellClass} text-muted-foreground`}>{formatRelative(m.received_at)}</td>
+                        <td className={`${tableCellClass} whitespace-nowrap font-mono-display text-xs text-muted-foreground`}>{formatDate(m.received_at)}</td>
                         <td className="w-10 px-3 py-3 text-right text-muted-foreground transition-colors group-hover:text-accent">
                           <Link to={`/admin/messages/${m.id}`} aria-label="打开邮件">
                             {Icon.arrow}
@@ -226,7 +226,7 @@ export default function Mailboxes() {
                       <td className={`${tableCellClass} num text-right`}>
                         {m.unread_count > 0 ? <span className="font-black text-warning">{m.unread_count}</span> : <span className="text-subtle">-</span>}
                       </td>
-                      <td className={`${tableCellClass} text-muted-foreground`}>{formatRelative(m.last_received_at)}</td>
+                      <td className={`${tableCellClass} whitespace-nowrap font-mono-display text-xs text-muted-foreground`}>{formatDate(m.last_received_at)}</td>
                       <td className="w-10 px-3 py-3 text-right text-muted-foreground transition-colors group-hover:text-accent">
                         <Link to={`/admin/mailboxes/${m.id}`} aria-label="打开邮箱">
                           {Icon.arrow}

@@ -404,10 +404,10 @@ export function Pagination({
   );
 }
 
-export function Toolbar({ children, className }: { children: ReactNode; className?: string }) {
+export function Toolbar({ children, className, contentClassName }: { children: ReactNode; className?: string; contentClassName?: string }) {
   return (
     <Panel className={cn("mb-5 px-4 py-3", className)}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">{children}</div>
+      <div className={cn("flex flex-col gap-3 md:flex-row md:items-center md:justify-between", contentClassName)}>{children}</div>
     </Panel>
   );
 }
