@@ -33,6 +33,24 @@ INSTALL_DIR_SET=0
 log() { printf '[%s] %s\n' "$APP_NAME" "$*"; }
 die() { printf '[%s] 错误: %s\n' "$APP_NAME" "$*" >&2; exit 1; }
 
+CURRENT_STEP=""
+set_step() {
+  CURRENT_STEP="$*"
+  log "$CURRENT_STEP"
+}
+
+on_error() {
+  local status="$?"
+  if [[ -n "$CURRENT_STEP" ]]; then
+    printf '[%s] 错误: %s 失败，退出码 %s\n' "$APP_NAME" "$CURRENT_STEP" "$status" >&2
+  else
+    printf '[%s] 错误: 安装脚本执行失败，退出码 %s\n' "$APP_NAME" "$status" >&2
+  fi
+  exit "$status"
+}
+
+trap on_error ERR
+
 set_layout_paths() {
   INSTALL_DIR="${INSTALL_DIR%/}"
   DATA_DIR="${INSTALL_DIR}/data"
@@ -147,7 +165,13 @@ parse_args() {
 }
 
 is_interactive() {
-  [[ -t 0 || -r /dev/tty ]]
+  if [[ -t 0 ]]; then
+    return 0
+  fi
+  if { : >/dev/tty; } 2>/dev/null; then
+    return 0
+  fi
+  return 1
 }
 
 ensure_root() {
@@ -216,7 +240,14 @@ detect_arch() {
 }
 
 latest_version() {
-  curl -fsSL "${GITHUB_API}/releases/latest" | grep -m1 '"tag_name"' | cut -d '"' -f4 || true
+  local response line
+  response="$(curl -fsSL "${GITHUB_API}/releases/latest")" || return 0
+  while IFS= read -r line; do
+    if [[ "$line" =~ \"tag_name\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
+      printf '%s' "${BASH_REMATCH[1]}"
+      return
+    fi
+  done <<<"$response"
 }
 
 resolve_version() {
@@ -688,56 +719,83 @@ EOF
 }
 
 do_install() {
+  CURRENT_STEP=""
   check_system
   if [[ -x "${INSTALL_DIR}/cf-email" ]]; then
     die "cf-email 已安装；请使用 upgrade"
   fi
   collect_config
+  set_step "正在创建系统用户"
   create_user
+  set_step "正在准备安装目录"
   prepare_dirs
 
   local version arch tmpdir
+  set_step "正在获取最新版本"
   version="$(resolve_version)"
+  set_step "正在检测系统架构"
   arch="$(detect_arch)"
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"; trap - RETURN' RETURN
 
+  CURRENT_STEP="正在下载发布包"
   download_release "$version" "$arch" "$tmpdir"
+  set_step "正在安装程序文件"
   install_binary "${tmpdir}/cf-email"
+  set_step "正在写入配置文件"
   write_config
+  set_step "正在写入 systemd 服务"
   write_service
+  set_step "正在写入管理命令"
   write_command
+  set_step "正在启动服务"
   start_service
+  set_step "正在检查服务健康状态"
   verify_service || die "服务健康检查未通过"
+  CURRENT_STEP=""
   print_summary
 }
 
 do_upgrade() {
+  CURRENT_STEP=""
   check_system
   [[ -x "${INSTALL_DIR}/cf-email" ]] || die "cf-email 尚未安装"
+  set_step "正在创建系统用户"
   create_user
+  set_step "正在准备安装目录"
   prepare_dirs
+  set_step "正在迁移配置文件"
   migrate_config
   [[ -f "$CONFIG_FILE" ]] || die "找不到现有配置文件；请确认 ${CONFIG_FILE} 或 ${LEGACY_CONFIG_FILE} 存在"
 
   local version arch tmpdir previous
+  set_step "正在获取最新版本"
   version="$(resolve_version)"
+  set_step "正在检测系统架构"
   arch="$(detect_arch)"
   tmpdir="$(mktemp -d)"
   previous="${INSTALL_DIR}/cf-email.backup.$(date +%Y%m%d%H%M%S)"
   trap 'rm -rf "$tmpdir"; trap - RETURN' RETURN
 
+  CURRENT_STEP="正在下载发布包"
   download_release "$version" "$arch" "$tmpdir"
+  set_step "正在备份现有程序"
   cp "${INSTALL_DIR}/cf-email" "$previous"
+  set_step "正在安装程序文件"
   install -m 0755 "${tmpdir}/cf-email" "${INSTALL_DIR}/cf-email"
+  set_step "正在写入 systemd 服务"
   write_service
+  set_step "正在写入管理命令"
   write_command
+  set_step "正在重启服务"
   systemctl restart "$SERVICE_NAME"
+  set_step "正在检查服务健康状态"
   if ! verify_service; then
     cp "$previous" "${INSTALL_DIR}/cf-email"
     systemctl restart "$SERVICE_NAME" || true
     die "升级失败，已回滚到 ${previous}"
   fi
+  CURRENT_STEP=""
   log "已升级到 ${version}"
 }
 
