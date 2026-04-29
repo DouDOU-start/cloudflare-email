@@ -36,10 +36,10 @@ sender -> Cloudflare Email Routing -> Worker -> Go backend
 curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash
 ```
 
-默认安装到 `/opt/cf-email`，也可以安装时指定目录：
+安装时会提示选择 HTTP 监听端口，默认 `8080`；如果端口已被占用，交互模式会要求重新选择，非交互模式会直接退出。默认安装到 `/opt/cf-email`，也可以安装时指定目录和端口：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email --port 8081
 ```
 
 安装后主要文件会放在同一个程序目录下：
@@ -92,7 +92,7 @@ TURNSTILE_SECRET_KEY=
 
 生产环境至少需要确认：
 
-- `PUBLIC_BASE_URL` 默认是 `http://localhost:8080`，生产环境建议改成公网 HTTPS 地址。
+- `PUBLIC_BASE_URL` 默认跟随安装时选择的端口，例如 `http://localhost:8080`，生产环境建议改成公网 HTTPS 地址。
 - `INGEST_TOKEN` 和 `INGEST_SECRET` 与 Worker secrets 一致。
 - `SESSION_SECRET` 是稳定的长随机值。
 - `ADMIN_PASSWORD` 当前明文保存在配置中，需要保护配置文件权限。
@@ -111,14 +111,14 @@ make worker-deploy # 部署 Cloudflare Worker
 ## 运维
 
 ```bash
-sudo bash deploy/install.sh start
-sudo bash deploy/install.sh stop
-sudo bash deploy/install.sh restart
-sudo bash deploy/install.sh status
-sudo bash deploy/install.sh logs
-sudo bash deploy/install.sh upgrade
-sudo bash deploy/install.sh uninstall -y
-sudo bash deploy/install.sh uninstall --purge -y
+sudo systemctl start cf-email
+sudo systemctl stop cf-email
+sudo systemctl restart cf-email
+sudo systemctl status cf-email
+sudo journalctl -u cf-email -f
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- upgrade
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- uninstall -y
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- uninstall --purge -y
 ```
 
 `pause` 是 `stop` 的别名。`uninstall` 默认只移除服务和二进制，保留程序目录中的配置和数据；`--purge` 会删除整个程序目录。
