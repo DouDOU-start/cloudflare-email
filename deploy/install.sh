@@ -183,11 +183,11 @@ validate_install_dir() {
 }
 
 resolve_existing_install_dir() {
-  [[ -f "$SERVICE_FILE" ]] || return
+  [[ -f "$SERVICE_FILE" ]] || return 0
   local exec_start
   exec_start="$(grep -m1 '^ExecStart=' "$SERVICE_FILE" | cut -d '=' -f2-)"
-  [[ -n "$exec_start" ]] || return
-  [[ "${exec_start##*/}" == "cf-email" ]] || return
+  [[ -n "$exec_start" ]] || return 0
+  [[ "${exec_start##*/}" == "cf-email" ]] || return 0
   INSTALL_DIR="${exec_start%/cf-email}"
   set_layout_paths
 }
@@ -216,7 +216,7 @@ detect_arch() {
 }
 
 latest_version() {
-  curl -fsSL "${GITHUB_API}/releases/latest" | grep -m1 '"tag_name"' | cut -d '"' -f4
+  curl -fsSL "${GITHUB_API}/releases/latest" | grep -m1 '"tag_name"' | cut -d '"' -f4 || true
 }
 
 resolve_version() {
