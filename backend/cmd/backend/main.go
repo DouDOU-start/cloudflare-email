@@ -52,7 +52,6 @@ func main() {
 
 	ingestHandler := &ingest.Handler{
 		Config:  cfgStore,
-		Secret:  cfg.IngestSecret,
 		Queries: queries,
 		DB:      conn,
 		Storage: store,
@@ -65,7 +64,6 @@ func main() {
 		Storage:        store,
 		Config:         cfgStore,
 		Logger:         logger,
-		SessionSecret:  cfg.SessionSecret,
 		PublicBaseURL:  cfg.PublicBaseURL,
 		TurnstileKey:   cfg.TurnstileSecret,
 		TurnstileSite:  cfg.TurnstileSite,

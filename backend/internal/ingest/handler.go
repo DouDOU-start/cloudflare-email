@@ -21,7 +21,6 @@ import (
 
 type Handler struct {
 	Config  *config.Store
-	Secret  string
 	Queries *gen.Queries
 	DB      *sql.DB
 	Storage storage.Store
@@ -51,7 +50,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	skew := time.Duration(IngestClockSkew) * time.Second
-	if err := VerifySignature(h.Secret, r.Header.Get("X-Timestamp"), r.Header.Get("X-Signature"), body, skew); err != nil {
+	if err := VerifySignature(cfg.IngestSecret, r.Header.Get("X-Timestamp"), r.Header.Get("X-Signature"), body, skew); err != nil {
 		h.Logger.Warn("ingest bad signature", "err", err, "ip", r.RemoteAddr)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return

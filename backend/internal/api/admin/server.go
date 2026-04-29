@@ -18,7 +18,6 @@ type Server struct {
 	Storage        storage.Store
 	Config         *config.Store
 	Logger         *slog.Logger
-	SessionSecret  string
 	PublicBaseURL  string
 	TurnstileKey   string // optional
 	TurnstileSite  string // optional

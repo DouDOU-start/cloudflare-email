@@ -32,12 +32,16 @@ type Store struct {
 
 type EditableFields struct {
 	IngestToken   bool `json:"ingest_token"`
+	IngestSecret  bool `json:"ingest_secret"`
+	SessionSecret bool `json:"session_secret"`
 	AdminUsername bool `json:"admin_username"`
 	AdminPassword bool `json:"admin_password"`
 }
 
 type SystemSettings struct {
 	IngestToken      string         `json:"ingest_token"`
+	IngestSecretSet  bool           `json:"ingest_secret_set"`
+	SessionSecretSet bool           `json:"session_secret_set"`
 	AdminUsername    string         `json:"admin_username"`
 	AdminPasswordSet bool           `json:"admin_password_set"`
 	Editable         EditableFields `json:"editable"`
@@ -45,6 +49,8 @@ type SystemSettings struct {
 
 type SystemPatch struct {
 	IngestToken   *string
+	IngestSecret  *string
+	SessionSecret *string
 	AdminUsername *string
 	AdminPassword *string
 }
@@ -137,7 +143,7 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if patch.IngestToken == nil && patch.AdminUsername == nil && patch.AdminPassword == nil {
+	if patch.IngestToken == nil && patch.IngestSecret == nil && patch.SessionSecret == nil && patch.AdminUsername == nil && patch.AdminPassword == nil {
 		return systemSettingsFromConfig(s.cfg), nil
 	}
 	if err := validatePatch(patch); err != nil {
@@ -161,6 +167,12 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	if patch.IngestToken != nil {
 		fc.IngestToken = strings.TrimSpace(*patch.IngestToken)
 	}
+	if patch.IngestSecret != nil {
+		fc.IngestSecret = strings.TrimSpace(*patch.IngestSecret)
+	}
+	if patch.SessionSecret != nil {
+		fc.SessionSecret = strings.TrimSpace(*patch.SessionSecret)
+	}
 	if patch.AdminUsername != nil {
 		fc.Admin.Username = strings.TrimSpace(*patch.AdminUsername)
 	}
@@ -170,9 +182,11 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 
 	updated := s.cfg
 	updated.IngestToken = firstNonEmpty(os.Getenv("INGEST_TOKEN"), fc.IngestToken)
+	updated.IngestSecret = firstNonEmpty(os.Getenv("INGEST_SECRET"), fc.IngestSecret)
+	updated.SessionSecret = firstNonEmpty(os.Getenv("SESSION_SECRET"), fc.SessionSecret)
 	updated.AdminUsername = firstNonEmpty(os.Getenv("ADMIN_USERNAME"), fc.Admin.Username)
 	updated.AdminPassword = firstNonEmpty(os.Getenv("ADMIN_PASSWORD"), fc.Admin.Password)
-	if updated.IngestToken == "" || updated.AdminUsername == "" || updated.AdminPassword == "" {
+	if updated.IngestToken == "" || updated.IngestSecret == "" || updated.SessionSecret == "" || updated.AdminUsername == "" || updated.AdminPassword == "" {
 		return SystemSettings{}, fmt.Errorf("system config fields must not be empty")
 	}
 
@@ -191,10 +205,14 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 func systemSettingsFromConfig(cfg Config) SystemSettings {
 	return SystemSettings{
 		IngestToken:      cfg.IngestToken,
+		IngestSecretSet:  cfg.IngestSecret != "",
+		SessionSecretSet: cfg.SessionSecret != "",
 		AdminUsername:    cfg.AdminUsername,
 		AdminPasswordSet: cfg.AdminPassword != "",
 		Editable: EditableFields{
 			IngestToken:   os.Getenv("INGEST_TOKEN") == "",
+			IngestSecret:  os.Getenv("INGEST_SECRET") == "",
+			SessionSecret: os.Getenv("SESSION_SECRET") == "",
 			AdminUsername: os.Getenv("ADMIN_USERNAME") == "",
 			AdminPassword: os.Getenv("ADMIN_PASSWORD") == "",
 		},
@@ -204,6 +222,12 @@ func systemSettingsFromConfig(cfg Config) SystemSettings {
 func validatePatch(patch SystemPatch) error {
 	if patch.IngestToken != nil && strings.TrimSpace(*patch.IngestToken) == "" {
 		return fmt.Errorf("ingest_token is required")
+	}
+	if patch.IngestSecret != nil && strings.TrimSpace(*patch.IngestSecret) == "" {
+		return fmt.Errorf("ingest_secret is required")
+	}
+	if patch.SessionSecret != nil && strings.TrimSpace(*patch.SessionSecret) == "" {
+		return fmt.Errorf("session_secret is required")
 	}
 	if patch.AdminUsername != nil && strings.TrimSpace(*patch.AdminUsername) == "" {
 		return fmt.Errorf("admin_username is required")
@@ -217,6 +241,12 @@ func validatePatch(patch SystemPatch) error {
 func rejectEnvOverrides(patch SystemPatch) error {
 	if patch.IngestToken != nil && os.Getenv("INGEST_TOKEN") != "" {
 		return fmt.Errorf("ingest_token is controlled by environment")
+	}
+	if patch.IngestSecret != nil && os.Getenv("INGEST_SECRET") != "" {
+		return fmt.Errorf("ingest_secret is controlled by environment")
+	}
+	if patch.SessionSecret != nil && os.Getenv("SESSION_SECRET") != "" {
+		return fmt.Errorf("session_secret is controlled by environment")
 	}
 	if patch.AdminUsername != nil && os.Getenv("ADMIN_USERNAME") != "" {
 		return fmt.Errorf("admin_username is controlled by environment")

@@ -51,6 +51,7 @@ export default function Tokens() {
   const hasMailboxAddress = normalizedMailboxAddress.length > 0;
   const mailboxAddressError = hasMailboxAddress && !EMAIL_RE.test(normalizedMailboxAddress) ? "请输入完整邮箱地址，例如 user@example.com" : "";
   const existingMailbox = mailboxes.data?.find((m) => m.address.toLowerCase() === normalizedMailboxAddress);
+  const ttlDays = ttl === "" ? 0 : Number(ttl);
 
   const create = useMutation({
     mutationFn: async () => {
@@ -76,7 +77,7 @@ export default function Tokens() {
       const token = await api.post<Token>("/api/admin/tokens", {
         mailbox_id: mailbox.id,
         name,
-        ttl_days: Number(ttl),
+        ttl_days: ttlDays,
       });
 
       return { token, createdMailbox };
@@ -167,7 +168,13 @@ export default function Tokens() {
               <Input placeholder="例如：发给 Bob" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Field label="天数" className="space-y-1.5">
-              <Input type="number" min={0} placeholder="0 为永久" value={ttl} onChange={(e) => setTTL(e.target.value)} />
+              <Input
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0 为永久"
+                value={ttl}
+                onChange={(e) => setTTL(e.target.value.replace(/\D/g, ""))}
+              />
             </Field>
             <Button className="h-11 px-5" disabled={!hasMailboxAddress || !!mailboxAddressError || create.isPending} onClick={() => create.mutate()} variant="stamp">
               {create.isPending ? "创建中..." : "创建"}

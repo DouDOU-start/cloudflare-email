@@ -83,7 +83,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.recordAttempt(ctx, ip, req.Username, true)
 
 	ttl := time.Duration(sessionTTLHours) * time.Hour
-	cookie, exp := auth.IssueSession(s.SessionSecret, configuredAdminID, ttl)
+	cookie, exp := auth.IssueSession(cfg.SessionSecret, configuredAdminID, ttl)
 	auth.SetSessionCookie(w, cookie, exp, s.secureCookie())
 
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{

@@ -9,6 +9,8 @@ import (
 
 type updateSystemConfigReq struct {
 	IngestToken   *string `json:"ingest_token,omitempty"`
+	IngestSecret  *string `json:"ingest_secret,omitempty"`
+	SessionSecret *string `json:"session_secret,omitempty"`
 	AdminUsername *string `json:"admin_username,omitempty"`
 	AdminPassword *string `json:"admin_password,omitempty"`
 }
@@ -26,6 +28,8 @@ func (s *Server) handleUpdateSystemConfig(w http.ResponseWriter, r *http.Request
 
 	settings, err := s.Config.UpdateSystemSettings(config.SystemPatch{
 		IngestToken:   req.IngestToken,
+		IngestSecret:  req.IngestSecret,
+		SessionSecret: req.SessionSecret,
 		AdminUsername: req.AdminUsername,
 		AdminPassword: req.AdminPassword,
 	})

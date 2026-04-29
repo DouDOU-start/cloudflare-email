@@ -1,53 +1,53 @@
 # cf-email
 
-Self-hosted email receiver. Cloudflare Email Routing forwards messages through a thin Worker relay to a Go backend, which parses, filters, stores, and serves them through an admin web UI and tokenized viewer links.
+自托管邮件接收器。Cloudflare Email Routing 将邮件转发到轻量 Worker 中继，再由 Go 后端完成解析、过滤、存储，并通过管理后台和带令牌的查看链接提供访问。
 
-- **Only receives**: sending email is out of scope.
-- **Single-tenant**: one configured admin account.
-- **Multi-domain**: any Cloudflare Email Routing domain can forward to the same backend.
-- **Token share**: admin can generate `/v/<token>` links for read-only mailbox access.
+- **只接收邮件**：不包含发信能力。
+- **单租户**：使用一个已配置的管理员账号。
+- **多域名**：任意 Cloudflare Email Routing 域名都可以转发到同一个后端。
+- **令牌分享**：管理员可以生成 `/v/<token>` 链接，提供只读邮箱访问。
 
-## Architecture
+## 架构
 
-```
+```text
 sender -> Cloudflare Email Routing -> Worker (HMAC relay) -> Go backend
                                                               | SQLite (WAL)
                                                               | ./data/storage (attachments)
                                                               ` embedded React SPA
 ```
 
-- **backend/**: Go service for ingest, admin API, viewer API, SQLite, attachment storage, and embedded SPA hosting.
-- **web/**: React + Vite + TypeScript + Tailwind admin/viewer frontend.
-- **worker/**: Cloudflare Email Worker that signs and forwards raw MIME to the backend.
+- **backend/**：Go 服务，负责邮件摄入、管理 API、查看 API、SQLite、附件存储和内嵌 SPA 托管。
+- **web/**：React + Vite + TypeScript + Tailwind 管理端和查看端前端。
+- **worker/**：Cloudflare Email Worker，负责签名并转发原始 MIME 到后端。
 
-## Tech Stack
+## 技术栈
 
-| Layer | Choice |
+| 层级 | 选型 |
 | --- | --- |
-| Email entry | Cloudflare Email Routing + Email Worker |
-| Backend | Go 1.25+, chi, `modernc.org/sqlite`, sqlc, goose |
-| MIME parser | `github.com/jhillyerd/enmime` |
-| Admin auth | Configured credentials, constant-time compare, signed session cookie |
-| Frontend | React + Vite + TypeScript + Tailwind + TanStack Query |
-| Container | Distroless multi-stage Dockerfile |
+| 邮件入口 | Cloudflare Email Routing + Email Worker |
+| 后端 | Go 1.25+、chi、`modernc.org/sqlite`、sqlc、goose |
+| MIME 解析 | `github.com/jhillyerd/enmime` |
+| 管理认证 | 配置凭据、常量时间比较、签名会话 Cookie |
+| 前端 | React + Vite + TypeScript + Tailwind + TanStack Query |
+| 容器 | Distroless 多阶段 Dockerfile |
 
-## Quick Start
+## 快速开始
 
 ```bash
 make dev
 ```
 
-`make dev` starts Vite on `http://localhost:5173` and the Go backend on `http://localhost:8080`. On first run it copies [backend/config.yaml.example](backend/config.yaml.example) to `backend/config.yaml`. Open `http://localhost:5173/admin` and log in with the default dev credentials from that config.
+`make dev` 会在 `http://localhost:5173` 启动 Vite，并在 `http://localhost:8080` 启动 Go 后端。首次运行时会把 [backend/config.yaml.example](backend/config.yaml.example) 复制为 `backend/config.yaml`。打开 `http://localhost:5173/admin`，使用该配置里的默认开发账号登录。
 
-For a production-style local run with the frontend embedded into the backend binary path:
+需要以接近生产的方式在本地运行，并将前端嵌入后端二进制路径时：
 
 ```bash
 make run
 ```
 
-## Configuration
+## 配置
 
-The backend reads `backend/config.yaml` by default. Use `CONFIG_PATH` to point at another config file, or override individual fields with environment variables:
+后端默认读取 `backend/config.yaml`。可以使用 `CONFIG_PATH` 指向其他配置文件，也可以通过环境变量覆盖单个字段：
 
 ```bash
 BIND_ADDR=:8080
@@ -63,29 +63,29 @@ TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 ```
 
-Important production values:
+生产环境的重要配置：
 
-- `PUBLIC_BASE_URL` must match the public HTTPS origin that serves the backend.
-- `INGEST_TOKEN` must be identical in the backend config and Worker secret.
-- `INGEST_SECRET` must be identical in the backend config and Worker secret.
-- `SESSION_SECRET` should be a long random value and stable across restarts.
-- `ADMIN_PASSWORD` is stored in config as plaintext in the current implementation, so protect config file access.
+- `PUBLIC_BASE_URL` 必须匹配对外提供后端服务的 HTTPS 源站。
+- `INGEST_TOKEN` 必须和 Worker secret 中的值一致。
+- `INGEST_SECRET` 必须和 Worker secret 中的值一致。
+- `SESSION_SECRET` 应该是较长的随机值，并在重启之间保持稳定。
+- 当前实现中 `ADMIN_PASSWORD` 以明文存储在配置中，因此需要保护配置文件的访问权限。
 
-## Build And Deploy
+## 构建与部署
 
-Build the embedded backend binary:
+构建内嵌前端的后端二进制：
 
 ```bash
 make backend-build
 ```
 
-Build the container image from the repository root:
+在仓库根目录构建容器镜像：
 
 ```bash
 docker build -f backend/Dockerfile -t cf-email .
 ```
 
-Run the Worker deploy after setting secrets:
+设置 secrets 后部署 Worker：
 
 ```bash
 cd worker
@@ -95,35 +95,35 @@ npx wrangler secret put INGEST_URL
 npx wrangler deploy
 ```
 
-`INGEST_URL` should be `https://<your-domain>/ingest/email`. In Cloudflare Dashboard, enable Email Routing for each domain and route catch-all or selected addresses to the `cf-email-relay` Worker.
+`INGEST_URL` 应为 `https://<your-domain>/ingest/email`。在 Cloudflare Dashboard 中，为每个域名启用 Email Routing，并将 catch-all 或指定地址路由到 `cf-email-relay` Worker。
 
-## Makefile Targets
+## Makefile 目标
 
 ```bash
-make help          # list targets
-make dev           # Vite HMR + Go backend
-make run           # build SPA, embed it, run backend locally
-make web-build     # build React SPA
-make web-embed     # copy built SPA into backend/internal/web/dist
-make backend-build # build backend binary to backend/bin/backend
-make worker-deploy # deploy Cloudflare Worker
-make clean         # remove build outputs
+make help          # 列出目标
+make dev           # Vite HMR + Go 后端
+make run           # 构建 SPA、嵌入后端并在本地运行
+make web-build     # 构建 React SPA
+make web-embed     # 将构建后的 SPA 复制到 backend/internal/web/dist
+make backend-build # 将后端二进制构建到 backend/bin/backend
+make worker-deploy # 部署 Cloudflare Worker
+make clean         # 删除构建产物
 ```
 
-## Security Model
+## 安全模型
 
-| Surface | Defense |
+| 暴露面 | 防护 |
 | --- | --- |
-| Worker -> backend | HMAC-SHA256 signature + timestamp replay window |
-| `/admin` login | Constant-time credential compare, per-IP rate limit, optional Turnstile |
-| `/admin` session | HMAC-signed HttpOnly cookie, Secure outside local dev, SameSite=Strict |
-| `/v/:token` | 256-bit random token stored as SHA-256 hash, constant-time compare, rate limit and ban window |
-| HTML mail | Rendered in `sandbox=""` iframe with strict CSP; HTTPS and data images are allowed |
-| Attachments | Stored on local filesystem and served only through authorized API paths |
+| Worker -> 后端 | HMAC-SHA256 签名 + 时间戳重放窗口 |
+| `/admin` 登录 | 常量时间凭据比较、按 IP 限流、可选 Turnstile |
+| `/admin` 会话 | HMAC 签名 HttpOnly Cookie，本地开发外启用 Secure，SameSite=Strict |
+| `/v/:token` | 256 位随机令牌，以 SHA-256 哈希存储，常量时间比较，限流和封禁窗口 |
+| HTML 邮件 | 在 `sandbox=""` iframe 中渲染，并使用严格 CSP；允许 HTTPS 和 data 图片 |
+| 附件 | 存储在本地文件系统，只能通过已授权 API 路径访问 |
 
-## Data Layout
+## 数据布局
 
-Runtime data is relative to the backend working directory unless configured otherwise:
+除非另行配置，运行时数据路径相对于后端工作目录：
 
 ```text
 data/
@@ -134,9 +134,9 @@ data/
     └── attachments/<message_id>/<index>-<filename>
 ```
 
-Use SQLite backup tooling such as `.backup` for consistent database backups. Copy `data/storage` with the database backup so attachment paths remain valid.
+使用 SQLite 的 `.backup` 等备份工具进行一致性数据库备份。备份数据库时同时复制 `data/storage`，确保附件路径仍然有效。
 
-## Project Layout
+## 项目结构
 
 ```text
 cf-email/
@@ -161,6 +161,6 @@ cf-email/
     └── src/index.ts
 ```
 
-## License
+## 许可证
 
-Private / unlicensed.
+私有 / 未授权。

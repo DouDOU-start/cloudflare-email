@@ -96,10 +96,14 @@ export interface Token {
 
 export interface SystemConfig {
   ingest_token: string;
+  ingest_secret_set: boolean;
+  session_secret_set: boolean;
   admin_username: string;
   admin_password_set: boolean;
   editable: {
     ingest_token: boolean;
+    ingest_secret: boolean;
+    session_secret: boolean;
     admin_username: boolean;
     admin_password: boolean;
   };

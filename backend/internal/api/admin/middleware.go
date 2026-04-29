@@ -20,7 +20,8 @@ func (s *Server) RequireSession(next http.Handler) http.Handler {
 			httpapi.WriteJSON(w, http.StatusUnauthorized, httpapi.Error{Error: "unauthorized"})
 			return
 		}
-		sess, err := auth.VerifySession(s.SessionSecret, cookie.Value)
+		cfg := s.Config.Snapshot()
+		sess, err := auth.VerifySession(cfg.SessionSecret, cookie.Value)
 		if err != nil {
 			auth.ClearSessionCookie(w, s.secureCookie())
 			httpapi.WriteJSON(w, http.StatusUnauthorized, httpapi.Error{Error: "unauthorized"})
