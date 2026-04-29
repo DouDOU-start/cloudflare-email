@@ -7,7 +7,7 @@ help:
 	@echo "  web-build     build React SPA"
 	@echo "  web-embed     build SPA and copy into backend embed dir"
 	@echo "  backend-build build Go backend binary to ./backend/bin/backend"
-	@echo "  worker-deploy wrangler deploy the CF Email Worker"
+	@echo "  worker-deploy configure Worker secrets and deploy the CF Email Worker"
 	@echo "  clean         remove build outputs"
 
 web-build:
@@ -48,8 +48,20 @@ run: web-embed
 backend-build: web-embed
 	cd backend && go build -trimpath -ldflags="-s -w" -o bin/backend ./cmd/backend
 
+worker-deploy: SHELL := /bin/bash
 worker-deploy:
-	cd worker && npx wrangler deploy
+	@cd worker && \
+	if ! npx wrangler whoami >/dev/null 2>&1; then \
+		echo "Cloudflare auth required. Running wrangler login..."; \
+		npx wrangler login; \
+	fi; \
+	read -r -p "INGEST_URL: " ingest_url </dev/tty || exit 1; \
+	read -r -s -p "INGEST_TOKEN: " ingest_token </dev/tty || exit 1; echo; \
+	read -r -s -p "INGEST_SECRET: " ingest_secret </dev/tty || exit 1; echo; \
+	printf '%s' "$$ingest_url" | npx wrangler secret put INGEST_URL && \
+	printf '%s' "$$ingest_token" | npx wrangler secret put INGEST_TOKEN && \
+	printf '%s' "$$ingest_secret" | npx wrangler secret put INGEST_SECRET && \
+	npx wrangler deploy
 
 clean:
 	rm -rf backend/bin backend/internal/web/dist/* web/dist worker/dist worker/.wrangler
