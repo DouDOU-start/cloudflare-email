@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cf-email/backend/internal/db/gen"
+	"github.com/cf-email/backend/internal/eml"
 	"github.com/cf-email/backend/internal/httpapi"
 	"github.com/cf-email/backend/internal/ratelimit"
 	"github.com/cf-email/backend/internal/storage"
@@ -42,6 +43,7 @@ func (s *Server) Routes() http.Handler {
 	r.With(s.tokenMiddleware).Get("/{token}/mailbox", s.handleMailbox)
 	r.With(s.tokenMiddleware).Get("/{token}/messages", s.handleListMessages)
 	r.With(s.tokenMiddleware).Get("/{token}/messages/{id}", s.handleGetMessage)
+	r.With(s.tokenMiddleware).Get("/{token}/messages/{id}/eml", s.handleDownloadMessageEML)
 	r.With(s.tokenMiddleware).Get("/{token}/attachments/{id}", s.handleDownloadAttachment)
 	return r
 }
@@ -200,6 +202,7 @@ func (s *Server) handleGetMessage(w http.ResponseWriter, r *http.Request) {
 		"size":        m.Size,
 		"text_body":   m.TextBody.String,
 		"html_body":   m.HtmlBody.String,
+		"has_raw":     m.RawStoragePath.Valid && m.RawStoragePath.String != "",
 		"attachments": views,
 	})
 }
@@ -228,6 +231,23 @@ func (s *Server) handleDownloadAttachment(w http.ResponseWriter, r *http.Request
 	}
 	defer rc.Close()
 	httpapi.ServeAttachment(w, a.Filename, a.ContentType.String, rc)
+}
+
+func (s *Server) handleDownloadMessageEML(w http.ResponseWriter, r *http.Request) {
+	mailboxID := getCtxInt(r, ctxMailboxID)
+	id, err := httpapi.PathInt64(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	m, err := s.Queries.GetMessageByID(r.Context(), id)
+	if err != nil || m.MailboxID != mailboxID {
+		http.NotFound(w, r)
+		return
+	}
+	if err := eml.ServeMessage(r.Context(), w, s.Queries, s.Storage, m); err != nil {
+		http.NotFound(w, r)
+	}
 }
 
 func getCtxInt(r *http.Request, k ctxKey) int64 {

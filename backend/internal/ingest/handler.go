@@ -135,37 +135,45 @@ func (h *Handler) resolveMailbox(ctx context.Context, address string) (gen.Mailb
 }
 
 func (h *Handler) store(ctx context.Context, mailboxID int64, from, to string, parsed *mimex.Parsed, raw []byte) error {
-	now := time.Now().Unix()
+	receivedAt := time.Now()
+	now := receivedAt.Unix()
 	textBody := nullableString(parsed.TextBody)
 	htmlBody := nullableString(parsed.HTMLBody)
+	rawKey := fmt.Sprintf("messages/%d/%d.eml", mailboxID, receivedAt.UnixNano())
 
 	tx, err := h.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	writtenAttachments := make([]string, 0, len(parsed.Attachments))
+	writtenKeys := make([]string, 0, len(parsed.Attachments)+1)
 	committed := false
 	defer func() {
 		if committed {
 			return
 		}
-		for _, key := range writtenAttachments {
+		for _, key := range writtenKeys {
 			_ = h.Storage.Delete(key)
 		}
 	}()
 	qx := h.Queries.WithTx(tx)
 
+	if err := h.Storage.Put(rawKey, raw); err != nil {
+		return fmt.Errorf("put raw message: %w", err)
+	}
+	writtenKeys = append(writtenKeys, rawKey)
+
 	msg, err := qx.CreateMessage(ctx, gen.CreateMessageParams{
-		MailboxID:  mailboxID,
-		MessageID:  nullableString(parsed.MessageID),
-		FromAddr:   from,
-		ToAddr:     to,
-		Subject:    nullableString(parsed.Subject),
-		ReceivedAt: now,
-		TextBody:   textBody,
-		HtmlBody:   htmlBody,
-		Size:       int64(len(raw)),
+		MailboxID:      mailboxID,
+		MessageID:      nullableString(parsed.MessageID),
+		FromAddr:       from,
+		ToAddr:         to,
+		Subject:        nullableString(parsed.Subject),
+		ReceivedAt:     now,
+		TextBody:       textBody,
+		HtmlBody:       htmlBody,
+		Size:           int64(len(raw)),
+		RawStoragePath: sql.NullString{String: rawKey, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("create message: %w", err)
@@ -176,7 +184,7 @@ func (h *Handler) store(ctx context.Context, mailboxID int64, from, to string, p
 		if err := h.Storage.Put(attKey, a.Data); err != nil {
 			return fmt.Errorf("put attachment: %w", err)
 		}
-		writtenAttachments = append(writtenAttachments, attKey)
+		writtenKeys = append(writtenKeys, attKey)
 		if _, err := qx.CreateAttachment(ctx, gen.CreateAttachmentParams{
 			MessageID:   msg.ID,
 			Filename:    a.Filename,

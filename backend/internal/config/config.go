@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -15,7 +16,6 @@ import (
 type Config struct {
 	ConfigPath      string
 	BindAddr        string
-	PublicBaseURL   string
 	DBPath          string
 	StorageDir      string
 	IngestToken     string
@@ -23,6 +23,7 @@ type Config struct {
 	SessionSecret   string
 	AdminUsername   string
 	AdminPassword   string
+	AdminAPIKey     string
 	TurnstileSite   string
 	TurnstileSecret string
 }
@@ -38,6 +39,7 @@ type EditableFields struct {
 	SessionSecret bool `json:"session_secret"`
 	AdminUsername bool `json:"admin_username"`
 	AdminPassword bool `json:"admin_password"`
+	AdminAPIKey   bool `json:"admin_api_key"`
 }
 
 type SystemSettings struct {
@@ -46,6 +48,7 @@ type SystemSettings struct {
 	SessionSecretSet bool           `json:"session_secret_set"`
 	AdminUsername    string         `json:"admin_username"`
 	AdminPasswordSet bool           `json:"admin_password_set"`
+	AdminAPIKey      string         `json:"admin_api_key"`
 	Editable         EditableFields `json:"editable"`
 }
 
@@ -55,18 +58,19 @@ type SystemPatch struct {
 	SessionSecret *string
 	AdminUsername *string
 	AdminPassword *string
+	AdminAPIKey   *string
 }
 
 // fileConfig mirrors the YAML schema. Fields are pointers/strings so we can
 // tell whether the user explicitly set them.
 type fileConfig struct {
 	BindAddr      string `yaml:"bind_addr"`
-	PublicBaseURL string `yaml:"public_base_url"`
 	DBPath        string `yaml:"db_path"`
 	StorageDir    string `yaml:"storage_dir"`
 	IngestToken   string `yaml:"ingest_token"`
 	IngestSecret  string `yaml:"ingest_secret"`
 	SessionSecret string `yaml:"session_secret"`
+	AdminAPIKey   string `yaml:"admin_api_key"`
 	Admin         struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
@@ -99,7 +103,6 @@ func Load() (*Config, error) {
 	c := &Config{
 		ConfigPath:      path,
 		BindAddr:        firstNonEmpty(os.Getenv("BIND_ADDR"), fc.BindAddr, ":8080"),
-		PublicBaseURL:   strings.TrimRight(firstNonEmpty(os.Getenv("PUBLIC_BASE_URL"), fc.PublicBaseURL), "/"),
 		DBPath:          firstNonEmpty(os.Getenv("DB_PATH"), fc.DBPath, "./data/email.db"),
 		StorageDir:      firstNonEmpty(os.Getenv("STORAGE_DIR"), fc.StorageDir, "./data/storage"),
 		IngestToken:     firstNonEmpty(os.Getenv("INGEST_TOKEN"), fc.IngestToken),
@@ -107,6 +110,7 @@ func Load() (*Config, error) {
 		SessionSecret:   firstNonEmpty(os.Getenv("SESSION_SECRET"), fc.SessionSecret),
 		AdminUsername:   firstNonEmpty(os.Getenv("ADMIN_USERNAME"), fc.Admin.Username),
 		AdminPassword:   firstNonEmpty(os.Getenv("ADMIN_PASSWORD"), fc.Admin.Password),
+		AdminAPIKey:     firstNonEmpty(os.Getenv("ADMIN_API_KEY"), fc.AdminAPIKey),
 		TurnstileSite:   firstNonEmpty(os.Getenv("TURNSTILE_SITE_KEY"), fc.Turnstile.SiteKey),
 		TurnstileSecret: firstNonEmpty(os.Getenv("TURNSTILE_SECRET_KEY"), fc.Turnstile.SecretKey),
 	}
@@ -120,9 +124,6 @@ func Load() (*Config, error) {
 	if c.SessionSecret == "" {
 		return nil, fmt.Errorf("session_secret is required (set in %s or SESSION_SECRET env)", path)
 	}
-	if c.PublicBaseURL == "" {
-		return nil, fmt.Errorf("public_base_url is required (set in %s or PUBLIC_BASE_URL env)", path)
-	}
 	if c.AdminUsername == "" || c.AdminPassword == "" {
 		return nil, fmt.Errorf("admin.username/admin.password must be set in %s or ADMIN_USERNAME/ADMIN_PASSWORD env", path)
 	}
@@ -132,7 +133,6 @@ func Load() (*Config, error) {
 func initConfigFile(path string) (fileConfig, error) {
 	var fc fileConfig
 	fc.BindAddr = ":8080"
-	fc.PublicBaseURL = "http://localhost:8080"
 	fc.DBPath = "./data/email.db"
 	fc.StorageDir = "./data/storage"
 	fc.Admin.Username = "admin"
@@ -146,6 +146,9 @@ func initConfigFile(path string) (fileConfig, error) {
 		return fileConfig{}, err
 	}
 	if fc.SessionSecret, err = randomHex(32); err != nil {
+		return fileConfig{}, err
+	}
+	if fc.AdminAPIKey, err = randomHex(32); err != nil {
 		return fileConfig{}, err
 	}
 
@@ -172,6 +175,19 @@ func randomHex(bytes int) (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+func GenerateAdminAPIKey() (string, error) {
+	return randomHex(32)
+}
+
+func VerifyAdminAPIKey(configured string, provided string) bool {
+	configured = strings.TrimSpace(configured)
+	provided = strings.TrimSpace(provided)
+	if configured == "" || provided == "" || len(configured) != len(provided) {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(configured), []byte(provided)) == 1
+}
+
 func NewStore(cfg *Config) *Store {
 	if cfg == nil {
 		return &Store{}
@@ -194,7 +210,7 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if patch.IngestToken == nil && patch.IngestSecret == nil && patch.SessionSecret == nil && patch.AdminUsername == nil && patch.AdminPassword == nil {
+	if patch.IngestToken == nil && patch.IngestSecret == nil && patch.SessionSecret == nil && patch.AdminUsername == nil && patch.AdminPassword == nil && patch.AdminAPIKey == nil {
 		return systemSettingsFromConfig(s.cfg), nil
 	}
 	if err := validatePatch(patch); err != nil {
@@ -230,6 +246,9 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	if patch.AdminPassword != nil {
 		fc.Admin.Password = *patch.AdminPassword
 	}
+	if patch.AdminAPIKey != nil {
+		fc.AdminAPIKey = strings.TrimSpace(*patch.AdminAPIKey)
+	}
 
 	updated := s.cfg
 	updated.IngestToken = firstNonEmpty(os.Getenv("INGEST_TOKEN"), fc.IngestToken)
@@ -237,6 +256,7 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	updated.SessionSecret = firstNonEmpty(os.Getenv("SESSION_SECRET"), fc.SessionSecret)
 	updated.AdminUsername = firstNonEmpty(os.Getenv("ADMIN_USERNAME"), fc.Admin.Username)
 	updated.AdminPassword = firstNonEmpty(os.Getenv("ADMIN_PASSWORD"), fc.Admin.Password)
+	updated.AdminAPIKey = firstNonEmpty(os.Getenv("ADMIN_API_KEY"), fc.AdminAPIKey)
 	if updated.IngestToken == "" || updated.IngestSecret == "" || updated.SessionSecret == "" || updated.AdminUsername == "" || updated.AdminPassword == "" {
 		return SystemSettings{}, fmt.Errorf("system config fields must not be empty")
 	}
@@ -260,12 +280,14 @@ func systemSettingsFromConfig(cfg Config) SystemSettings {
 		SessionSecretSet: cfg.SessionSecret != "",
 		AdminUsername:    cfg.AdminUsername,
 		AdminPasswordSet: cfg.AdminPassword != "",
+		AdminAPIKey:      cfg.AdminAPIKey,
 		Editable: EditableFields{
 			IngestToken:   os.Getenv("INGEST_TOKEN") == "",
 			IngestSecret:  os.Getenv("INGEST_SECRET") == "",
 			SessionSecret: os.Getenv("SESSION_SECRET") == "",
 			AdminUsername: os.Getenv("ADMIN_USERNAME") == "",
 			AdminPassword: os.Getenv("ADMIN_PASSWORD") == "",
+			AdminAPIKey:   os.Getenv("ADMIN_API_KEY") == "",
 		},
 	}
 }
@@ -286,6 +308,9 @@ func validatePatch(patch SystemPatch) error {
 	if patch.AdminPassword != nil && *patch.AdminPassword == "" {
 		return fmt.Errorf("admin_password is required")
 	}
+	if patch.AdminAPIKey != nil && strings.TrimSpace(*patch.AdminAPIKey) == "" {
+		return fmt.Errorf("admin_api_key is required")
+	}
 	return nil
 }
 
@@ -304,6 +329,9 @@ func rejectEnvOverrides(patch SystemPatch) error {
 	}
 	if patch.AdminPassword != nil && os.Getenv("ADMIN_PASSWORD") != "" {
 		return fmt.Errorf("admin_password is controlled by environment")
+	}
+	if patch.AdminAPIKey != nil && os.Getenv("ADMIN_API_KEY") != "" {
+		return fmt.Errorf("admin_api_key is controlled by environment")
 	}
 	return nil
 }

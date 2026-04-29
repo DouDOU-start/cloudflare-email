@@ -34,17 +34,18 @@ type Mailbox struct {
 }
 
 type Message struct {
-	ID         int64          `json:"id"`
-	MailboxID  int64          `json:"mailbox_id"`
-	MessageID  sql.NullString `json:"message_id"`
-	FromAddr   string         `json:"from_addr"`
-	ToAddr     string         `json:"to_addr"`
-	Subject    sql.NullString `json:"subject"`
-	ReceivedAt int64          `json:"received_at"`
-	TextBody   sql.NullString `json:"text_body"`
-	HtmlBody   sql.NullString `json:"html_body"`
-	Size       int64          `json:"size"`
-	IsRead     int64          `json:"is_read"`
+	ID             int64          `json:"id"`
+	MailboxID      int64          `json:"mailbox_id"`
+	MessageID      sql.NullString `json:"message_id"`
+	FromAddr       string         `json:"from_addr"`
+	ToAddr         string         `json:"to_addr"`
+	Subject        sql.NullString `json:"subject"`
+	ReceivedAt     int64          `json:"received_at"`
+	TextBody       sql.NullString `json:"text_body"`
+	HtmlBody       sql.NullString `json:"html_body"`
+	Size           int64          `json:"size"`
+	IsRead         int64          `json:"is_read"`
+	RawStoragePath sql.NullString `json:"raw_storage_path"`
 }
 
 type Token struct {

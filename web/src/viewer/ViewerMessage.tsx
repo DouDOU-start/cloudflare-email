@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { api, APIError } from "@/lib/api";
-import { AttachmentList, BackLink, EmptyState, MailBody, Panel } from "@/components/ui";
+import { AttachmentList, BackLink, EmptyState, LinkButton, MailBody, Panel } from "@/components/ui";
 import { formatBytes, formatDate } from "@/lib/format";
 import { ViewerShell } from "./Viewer";
 
@@ -14,6 +14,7 @@ interface ViewerDetail {
   size: number;
   text_body: string;
   html_body: string;
+  has_raw: boolean;
   attachments: { id: number; filename: string; content_type: string; size: number }[];
 }
 
@@ -53,15 +54,22 @@ export default function ViewerMessage() {
         <BackLink to={`/v/${token}`}>返回收件箱</BackLink>
       </div>
       <Panel className="mb-5 p-5 md:p-6">
-        <div className="min-w-0">
-          <div className="font-mono-display text-[11px] font-bold uppercase tracking-[0.16em] text-accent">共享邮件</div>
-          <h1 className="mt-2 break-words font-display text-3xl font-black leading-[0.95] tracking-[-0.05em] text-foreground md:text-5xl">
-            {m.subject || "(无主题)"}
-          </h1>
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-            <span className="break-all font-semibold text-foreground">{m.from_addr}</span>
-            <span className="font-mono-display text-[11px] uppercase tracking-[0.14em]">to</span>
-            <span className="break-all font-semibold text-foreground">{m.to_addr}</span>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="font-mono-display text-[11px] font-bold uppercase tracking-[0.16em] text-accent">共享邮件</div>
+            <h1 className="mt-2 break-words font-display text-3xl font-black leading-[0.95] tracking-[-0.05em] text-foreground md:text-5xl">
+              {m.subject || "(无主题)"}
+            </h1>
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <span className="break-all font-semibold text-foreground">{m.from_addr}</span>
+              <span className="font-mono-display text-[11px] uppercase tracking-[0.14em]">to</span>
+              <span className="break-all font-semibold text-foreground">{m.to_addr}</span>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <LinkButton variant="secondary" size="sm" href={`/api/v/${token}/messages/${m.id}/eml`}>
+              下载 EML
+            </LinkButton>
           </div>
         </div>
 

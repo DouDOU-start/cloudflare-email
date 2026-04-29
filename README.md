@@ -36,10 +36,10 @@ sender -> Cloudflare Email Routing -> Worker -> Go backend
 curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash
 ```
 
-安装时会提示选择 HTTP 监听端口，默认 `8080`；如果端口已被占用，交互模式会要求重新选择，非交互模式会直接退出。安装脚本会自动探测服务器公网 IPv4，并用它生成 Worker 的 `INGEST_URL`；也可以安装时手动指定目录、端口和公网地址：
+安装时会提示选择 HTTP 监听端口，默认 `8080`；如果端口已被占用，交互模式会要求重新选择，非交互模式会直接退出。安装脚本会自动探测服务器公网 IPv4，并用它生成 Worker 的 `INGEST_URL`；也可以安装时手动指定目录和端口：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email --port 8081 --public-base-url https://mail.example.com
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email --port 8081
 ```
 
 安装后主要文件会放在同一个程序目录下：
@@ -79,7 +79,6 @@ https://<backend-domain>/ingest/email
 
 ```bash
 BIND_ADDR=:8080
-PUBLIC_BASE_URL=https://mail.example.com
 DB_PATH=./data/email.db
 STORAGE_DIR=./data/storage
 INGEST_TOKEN=<worker-bearer-token>
@@ -93,7 +92,7 @@ TURNSTILE_SECRET_KEY=
 
 生产环境至少需要确认：
 
-- `PUBLIC_BASE_URL` 默认使用自动探测到的公网 IPv4 和安装时选择的端口，例如 `http://203.0.113.10:8080`；探测失败才回退到 `http://localhost:8080`，生产环境建议改成公网 HTTPS 地址。
+- 管理端生成的只读分享链接会按当前访问请求的域名和协议自动生成。
 - `INGEST_TOKEN` 和 `INGEST_SECRET` 与 Worker secrets 一致。
 - `SESSION_SECRET` 是稳定的长随机值。
 - `ADMIN_PASSWORD` 当前明文保存在配置中，需要保护配置文件权限。

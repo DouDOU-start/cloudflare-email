@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/cf-email/backend/internal/db/gen"
+	"github.com/cf-email/backend/internal/eml"
 	"github.com/cf-email/backend/internal/httpapi"
 )
 
@@ -27,6 +28,7 @@ type messageDetail struct {
 	messageListItem
 	TextBody    string           `json:"text_body"`
 	HTMLBody    string           `json:"html_body"`
+	HasRaw      bool             `json:"has_raw"`
 	Attachments []attachmentView `json:"attachments"`
 }
 
@@ -173,6 +175,7 @@ func (s *Server) handleGetMessage(w http.ResponseWriter, r *http.Request) {
 		},
 		TextBody:    m.TextBody.String,
 		HTMLBody:    m.HtmlBody.String,
+		HasRaw:      m.RawStoragePath.Valid && m.RawStoragePath.String != "",
 		Attachments: attViews,
 	})
 }
@@ -224,8 +227,28 @@ func (s *Server) handleDownloadAttachment(w http.ResponseWriter, r *http.Request
 	httpapi.ServeAttachment(w, a.Filename, a.ContentType.String, rc)
 }
 
-// purgeMessageFiles best-effort removes attachments for a message.
+func (s *Server) handleDownloadMessageEML(w http.ResponseWriter, r *http.Request) {
+	id, err := httpapi.PathInt64(r, "id")
+	if err != nil {
+		httpapi.WriteJSON(w, http.StatusBadRequest, httpapi.Error{Error: "bad id"})
+		return
+	}
+	m, err := s.Queries.GetMessageByID(r.Context(), id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := eml.ServeMessage(r.Context(), w, s.Queries, s.Storage, m); err != nil {
+		http.NotFound(w, r)
+	}
+}
+
+// purgeMessageFiles best-effort removes attachments and raw message content for a message.
 func (s *Server) purgeMessageFiles(ctx context.Context, messageID int64) {
+	m, err := s.Queries.GetMessageByID(ctx, messageID)
+	if err == nil && m.RawStoragePath.Valid && m.RawStoragePath.String != "" {
+		_ = s.Storage.Delete(m.RawStoragePath.String)
+	}
 	atts, _ := s.Queries.ListAttachmentsByMessage(ctx, messageID)
 	for _, a := range atts {
 		_ = s.Storage.Delete(a.StoragePath)

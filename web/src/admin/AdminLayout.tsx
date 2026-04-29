@@ -75,8 +75,6 @@ export default function AdminLayout() {
     );
   }
 
-  const initials = (me.data?.username ?? "?").slice(0, 1).toUpperCase();
-
   return (
     <div className="min-h-screen md:flex md:h-screen md:overflow-hidden">
       <header className="sticky top-0 z-40 border-b-2 border-border bg-card px-4 py-3 shadow-hard md:hidden">
@@ -123,14 +121,6 @@ export default function AdminLayout() {
         </nav>
 
         <div className="border-t-2 border-sidebar-border p-4">
-          <div className="mb-3 flex items-center gap-3 border-2 border-sidebar-border bg-sidebar-muted p-3">
-            <div className="flex h-10 w-10 items-center justify-center border-2 border-sidebar-accent bg-sidebar text-sm font-black text-sidebar-foreground-strong">
-              {initials}
-            </div>
-            <div className="min-w-0">
-              <div className="truncate font-semibold text-sidebar-foreground-strong">{me.data?.username}</div>
-            </div>
-          </div>
           <Button variant="ghost" size="sm" onClick={logout} className="w-full border-sidebar-border text-sidebar-foreground hover:bg-sidebar-muted hover:text-sidebar-foreground-strong">
             {I.logout}
             退出登录

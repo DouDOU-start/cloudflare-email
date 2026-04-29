@@ -2,12 +2,11 @@
 # Copy to ./config.yaml (cwd of the running binary) and fill in.
 # Override CONFIG_PATH env var if you want a different location.
 # Individual fields can also be overridden by env vars
-# (BIND_ADDR, PUBLIC_BASE_URL, DB_PATH, STORAGE_DIR,
+# (BIND_ADDR, DB_PATH, STORAGE_DIR,
 #  INGEST_TOKEN, INGEST_SECRET, SESSION_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD,
-#  TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY).
+#  ADMIN_API_KEY, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY).
 
 bind_addr: ":8080"
-public_base_url: "http://localhost:8080"
 db_path: "./data/email.db"
 storage_dir: "./data/storage"
 
@@ -21,6 +20,9 @@ ingest_secret: "change-me-ingest"
 
 # HMAC secret for signing admin session cookies.
 session_secret: "change-me-session"
+
+# Bearer token for admin API access.
+admin_api_key: "change-me-admin-api-key"
 
 # Single admin (plaintext). Edit + restart to change credentials.
 admin:

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type MessageDetail } from "@/lib/api";
-import { AttachmentList, BackLink, Button, ConfirmPanel, MailBody, Panel } from "@/components/ui";
+import { AttachmentList, BackLink, Button, ConfirmPanel, LinkButton, MailBody, Panel } from "@/components/ui";
 import { formatBytes, formatDate } from "@/lib/format";
 import { useState } from "react";
 
@@ -63,6 +63,9 @@ export default function MessageDetailPage() {
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
+            <LinkButton variant="secondary" size="sm" href={`/api/admin/messages/${m.id}/eml`}>
+              下载 EML
+            </LinkButton>
             <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
               删除
             </Button>

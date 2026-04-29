@@ -11,6 +11,7 @@ import (
 	"time"
 
 	adminapi "github.com/cf-email/backend/internal/api/admin"
+	codeapi "github.com/cf-email/backend/internal/api/code"
 	viewerapi "github.com/cf-email/backend/internal/api/viewer"
 	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db"
@@ -64,7 +65,6 @@ func main() {
 		Storage:        store,
 		Config:         cfgStore,
 		Logger:         logger,
-		PublicBaseURL:  cfg.PublicBaseURL,
 		TurnstileKey:   cfg.TurnstileSecret,
 		TurnstileSite:  cfg.TurnstileSite,
 		CookieInsecure: os.Getenv("DEV_INSECURE_COOKIE") == "1",
@@ -83,6 +83,13 @@ func main() {
 
 	r.Post("/ingest/email", ingestHandler.ServeHTTP)
 	r.Mount("/api/admin", adminServer.Routes())
+
+	codeServer := &codeapi.Server{
+		Queries: queries,
+		Config:  cfgStore,
+		Logger:  logger,
+	}
+	r.Mount("/api/code", codeServer.Routes())
 
 	viewerServer := &viewerapi.Server{
 		Queries: queries,

@@ -84,7 +84,7 @@ func (s *Server) handleGetToken(w http.ResponseWriter, r *http.Request) {
 		LastUsedAt:     nullInt(tok.LastUsedAt),
 	}
 	if tok.PlainToken.Valid && tok.PlainToken.String != "" {
-		url := s.tokenURL(tok.PlainToken.String)
+		url := s.tokenURL(r, tok.PlainToken.String)
 		view.URL = &url
 	}
 	httpapi.WriteJSON(w, http.StatusOK, view)
@@ -131,7 +131,7 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mb, _ := s.Queries.GetMailboxByID(r.Context(), req.MailboxID)
-	url := s.tokenURL(plain)
+	url := s.tokenURL(r, plain)
 	httpapi.WriteJSON(w, http.StatusOK, tokenView{
 		ID:             tok.ID,
 		MailboxID:      tok.MailboxID,
@@ -176,7 +176,7 @@ func (s *Server) handleResetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := s.tokenURL(plain)
+	url := s.tokenURL(r, plain)
 	httpapi.WriteJSON(w, http.StatusOK, tokenView{
 		ID:             tok.ID,
 		MailboxID:      tok.MailboxID,
@@ -229,8 +229,51 @@ func generateTokenSecret() (string, []byte, error) {
 	return plain, sum[:], nil
 }
 
-func (s *Server) tokenURL(plain string) string {
-	return strings.TrimRight(s.PublicBaseURL, "/") + "/v/" + plain
+func (s *Server) tokenURL(r *http.Request, plain string) string {
+	return requestBaseURL(r) + "/v/" + plain
+}
+
+func requestBaseURL(r *http.Request) string {
+	host := forwardedValue(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = forwardedParam(r.Header.Get("Forwarded"), "host")
+	}
+	if host == "" {
+		host = r.Host
+	}
+	if host == "" {
+		return ""
+	}
+
+	scheme := forwardedValue(r.Header.Get("X-Forwarded-Proto"))
+	if scheme == "" {
+		scheme = forwardedParam(r.Header.Get("Forwarded"), "proto")
+	}
+	if scheme != "http" && scheme != "https" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+
+	return scheme + "://" + host
+}
+
+func forwardedValue(value string) string {
+	value, _, _ = strings.Cut(value, ",")
+	return strings.Trim(strings.TrimSpace(value), `"`)
+}
+
+func forwardedParam(value, key string) string {
+	value, _, _ = strings.Cut(value, ",")
+	for _, part := range strings.Split(value, ";") {
+		name, raw, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if ok && strings.EqualFold(name, key) {
+			return strings.Trim(strings.TrimSpace(raw), `"`)
+		}
+	}
+	return ""
 }
 
 func nullInt(n sql.NullInt64) *int64 {

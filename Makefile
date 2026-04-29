@@ -33,7 +33,6 @@ dev:
 	@trap 'kill 0' INT TERM EXIT; \
 	(cd web && npm run dev) & \
 	(cd backend && \
-		PUBLIC_BASE_URL=http://localhost:5173 \
 		DEV_INSECURE_COOKIE=1 \
 		go run ./cmd/backend) & \
 	wait

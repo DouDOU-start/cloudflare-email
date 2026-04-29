@@ -21,7 +21,6 @@ DEFAULT_PORT="8080"
 COMMAND="install"
 VERSION=""
 PORT="${PORT:-}"
-PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-}"
 ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 TURNSTILE_SITE_KEY="${TURNSTILE_SITE_KEY:-}"
@@ -64,7 +63,7 @@ set_layout_paths
 usage() {
   cat <<'EOF'
 用法:
-  install.sh [install] [--install-dir DIR] [--port PORT] [--public-base-url URL] [--version VERSION]
+  install.sh [install] [--install-dir DIR] [--port PORT] [--version VERSION]
   install.sh upgrade [--install-dir DIR] [--version VERSION]
   install.sh start|stop|pause|restart
   install.sh uninstall [-y] [--purge]
@@ -76,7 +75,6 @@ usage() {
   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash
   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email --port 8081
   sudo bash install.sh install --version v0.1.0
-  sudo bash install.sh install --public-base-url https://mail.example.com
   cf-email restart
   cf-email update
   cf-email uninstall -y
@@ -108,15 +106,6 @@ parse_args() {
         ;;
       --version=*)
         VERSION="${1#*=}"
-        shift
-        ;;
-      --domain|--public-base-url)
-        [[ $# -ge 2 ]] || die "$1 需要指定值"
-        PUBLIC_BASE_URL="$2"
-        shift 2
-        ;;
-      --domain=*|--public-base-url=*)
-        PUBLIC_BASE_URL="${1#*=}"
         shift
         ;;
       --port)
@@ -292,13 +281,6 @@ prompt_value() {
   printf '%s' "$value"
 }
 
-normalize_base_url() {
-  local value="$1"
-  value="${value%/}"
-  [[ "$value" =~ ^https?://[^[:space:]]+$ ]] || die "PUBLIC_BASE_URL 必须以 http:// 或 https:// 开头"
-  printf '%s' "$value"
-}
-
 is_ipv4() {
   local value="$1" octet
   [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
@@ -323,7 +305,7 @@ detect_public_ip() {
   done
 }
 
-default_public_base_url() {
+default_access_url() {
   local public_ip
   public_ip="$(detect_public_ip)"
   if [[ -n "$public_ip" ]]; then
@@ -378,11 +360,6 @@ yaml_quote() {
 
 collect_config() {
   collect_port
-
-  if [[ -z "$PUBLIC_BASE_URL" ]]; then
-    PUBLIC_BASE_URL="$(default_public_base_url)"
-  fi
-  PUBLIC_BASE_URL="$(normalize_base_url "$PUBLIC_BASE_URL")"
 
   ADMIN_USERNAME="$(prompt_value '管理员用户名' "$ADMIN_USERNAME")"
   [[ -n "$ADMIN_USERNAME" ]] || die "管理员用户名不能为空"
@@ -471,21 +448,22 @@ write_config() {
     return
   fi
 
-  local ingest_token ingest_secret session_secret
+  local ingest_token ingest_secret session_secret admin_api_key
   ingest_token="$(random_secret)"
   ingest_secret="$(random_secret)"
   session_secret="$(random_secret)"
+  admin_api_key="$(random_secret)"
 
   umask 077
   cat >"$CONFIG_FILE" <<EOF
 bind_addr: ":${PORT}"
-public_base_url: $(yaml_quote "$PUBLIC_BASE_URL")
 db_path: $(yaml_quote "${DATA_DIR}/email.db")
 storage_dir: $(yaml_quote "$STORAGE_DIR")
 
 ingest_token: $(yaml_quote "$ingest_token")
 ingest_secret: $(yaml_quote "$ingest_secret")
 session_secret: $(yaml_quote "$session_secret")
+admin_api_key: $(yaml_quote "$admin_api_key")
 
 admin:
   username: $(yaml_quote "$ADMIN_USERNAME")
@@ -684,8 +662,8 @@ nested_config_value() {
 }
 
 print_summary() {
-  local public_base_url admin_username admin_password ingest_token ingest_secret
-  public_base_url="$(config_value public_base_url)"
+  local access_url admin_username admin_password ingest_token ingest_secret
+  access_url="$(default_access_url)"
   admin_username="$(nested_config_value username)"
   admin_password="$(nested_config_value password)"
   ingest_token="$(config_value ingest_token)"
@@ -697,12 +675,12 @@ cf-email 安装成功。
 
 安装目录: ${INSTALL_DIR}
 配置文件: ${CONFIG_FILE}
-管理后台地址: ${public_base_url}/admin
+管理后台地址: ${access_url}/admin
 管理员用户名: ${admin_username}
 管理员密码: ${admin_password}
 
 Worker 部署参数:
-INGEST_URL=${public_base_url}/ingest/email
+INGEST_URL=${access_url}/ingest/email
 INGEST_TOKEN=${ingest_token}
 INGEST_SECRET=${ingest_secret}
 

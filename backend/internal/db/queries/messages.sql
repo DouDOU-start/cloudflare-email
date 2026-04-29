@@ -1,8 +1,8 @@
 -- name: CreateMessage :one
 INSERT INTO messages (
     mailbox_id, message_id, from_addr, to_addr, subject,
-    received_at, text_body, html_body, size
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    received_at, text_body, html_body, size, raw_storage_path
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetMessageByID :one
@@ -46,6 +46,17 @@ SELECT COUNT(*) FROM messages WHERE mailbox_id = ? AND is_read = 0;
 
 -- name: MarkMessageRead :exec
 UPDATE messages SET is_read = 1 WHERE id = ?;
+
+-- name: FindLatestUnreadMessagesForCode :many
+SELECT
+    id, mailbox_id, message_id, from_addr, to_addr, subject,
+    received_at, text_body, html_body, size, is_read, raw_storage_path
+FROM messages
+WHERE is_read = 0
+  AND lower(to_addr) LIKE ?
+  AND lower(from_addr) LIKE ?
+ORDER BY received_at DESC
+LIMIT ?;
 
 -- name: DeleteMessage :exec
 DELETE FROM messages WHERE id = ?;

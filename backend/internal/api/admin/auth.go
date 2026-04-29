@@ -84,7 +84,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	ttl := time.Duration(sessionTTLHours) * time.Hour
 	cookie, exp := auth.IssueSession(cfg.SessionSecret, configuredAdminID, ttl)
-	auth.SetSessionCookie(w, cookie, exp, s.secureCookie())
+	auth.SetSessionCookie(w, cookie, exp, s.secureCookie(r))
 
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 		"username":  cfg.AdminUsername,
@@ -92,8 +92,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleLogout(w http.ResponseWriter, _ *http.Request) {
-	auth.ClearSessionCookie(w, s.secureCookie())
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	auth.ClearSessionCookie(w, s.secureCookie(r))
 	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

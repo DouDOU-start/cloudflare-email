@@ -17,6 +17,7 @@ import {
   tableRowClass,
 } from "@/components/ui";
 import { formatDate, formatRelative } from "@/lib/format";
+import { viewerURL } from "@/lib/viewer-url";
 import { useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -83,7 +84,7 @@ export default function Tokens() {
       return { token, createdMailbox };
     },
     onSuccess: ({ token, createdMailbox }) => {
-      setLinkResult({ title: "新链接", message: createdMailbox ? "已同步创建新邮箱。" : "", url: token.url });
+      setLinkResult({ title: "新链接", message: createdMailbox ? "已同步创建新邮箱。" : "", url: viewerURL(token.url) });
       setCopied(false);
       setName("");
       setMailboxAddress("");
@@ -97,7 +98,7 @@ export default function Tokens() {
     onSuccess: (data) => {
       setCopied(false);
       if (data.url) {
-        setLinkResult({ title: "当前链接", message: "", url: data.url });
+        setLinkResult({ title: "当前链接", message: "", url: viewerURL(data.url) });
         return;
       }
       setLinkResult({ title: "链接不可查看", message: "请重置后查看新链接。", tone: "danger" });
@@ -109,7 +110,7 @@ export default function Tokens() {
     onSuccess: (data) => {
       setPendingReset(null);
       setCopied(false);
-      setLinkResult({ title: "新链接", message: "旧链接已失效", url: data.url });
+      setLinkResult({ title: "新链接", message: "旧链接已失效", url: viewerURL(data.url) });
       qc.invalidateQueries({ queryKey: ["tokens"] });
     },
   });

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, pagingQuery, type Mailbox, type MessageSummary, type Paged } from "@/lib/api";
 import { BackLink, Button, ConfirmPanel, DataTable, EmptyState, Field, Input, Pagination, Panel, tableCellClass, tableHeadClass, tableHeaderCellClass, tableRowClass } from "@/components/ui";
 import { formatBytes, formatDate } from "@/lib/format";
+import { viewerURL } from "@/lib/viewer-url";
 import { useState } from "react";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -41,7 +42,7 @@ export default function MailboxDetail() {
   const createToken = useMutation({
     mutationFn: (name: string) => api.post<{ url: string }>("/api/admin/tokens", { mailbox_id: mailboxID, name }),
     onSuccess: (data) => {
-      setTokenURL(data.url);
+      setTokenURL(viewerURL(data.url));
       setTokenName("");
       setShowTokenForm(false);
       qc.invalidateQueries({ queryKey: ["tokens"] });

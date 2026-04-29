@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db/gen"
@@ -19,7 +18,6 @@ type Server struct {
 	Storage        storage.Store
 	Config         *config.Store
 	Logger         *slog.Logger
-	PublicBaseURL  string
 	TurnstileKey   string // optional
 	TurnstileSite  string // optional
 	CookieInsecure bool   // true only in local dev over HTTP
@@ -30,11 +28,25 @@ type Server struct {
 // cookies still encode an int — we just always use 1.
 const configuredAdminID int64 = 1
 
-func (s *Server) secureCookie() bool {
+func (s *Server) secureCookie(r *http.Request) bool {
 	if s.CookieInsecure {
 		return false
 	}
-	return !strings.HasPrefix(strings.ToLower(s.PublicBaseURL), "http://")
+	return requestScheme(r) == "https"
+}
+
+func requestScheme(r *http.Request) string {
+	scheme := forwardedValue(r.Header.Get("X-Forwarded-Proto"))
+	if scheme == "" {
+		scheme = forwardedParam(r.Header.Get("Forwarded"), "proto")
+	}
+	if scheme == "http" || scheme == "https" {
+		return scheme
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }
 
 // Routes returns a chi router mounted under /api/admin.
@@ -61,6 +73,7 @@ func (s *Server) Routes() http.Handler {
 
 		r.Get("/messages", s.handleListMessages)
 		r.Get("/messages/{id}", s.handleGetMessage)
+		r.Get("/messages/{id}/eml", s.handleDownloadMessageEML)
 		r.Post("/messages/{id}/read", s.handleMarkRead)
 		r.Delete("/messages/{id}", s.handleDeleteMessage)
 		r.Get("/attachments/{id}", s.handleDownloadAttachment)

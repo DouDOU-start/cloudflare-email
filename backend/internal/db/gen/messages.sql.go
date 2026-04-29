@@ -73,21 +73,22 @@ func (q *Queries) CountUnreadByMailbox(ctx context.Context, mailboxID int64) (in
 const createMessage = `-- name: CreateMessage :one
 INSERT INTO messages (
     mailbox_id, message_id, from_addr, to_addr, subject,
-    received_at, text_body, html_body, size
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, mailbox_id, message_id, from_addr, to_addr, subject, received_at, text_body, html_body, size, is_read
+    received_at, text_body, html_body, size, raw_storage_path
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, mailbox_id, message_id, from_addr, to_addr, subject, received_at, text_body, html_body, size, is_read, raw_storage_path
 `
 
 type CreateMessageParams struct {
-	MailboxID  int64          `json:"mailbox_id"`
-	MessageID  sql.NullString `json:"message_id"`
-	FromAddr   string         `json:"from_addr"`
-	ToAddr     string         `json:"to_addr"`
-	Subject    sql.NullString `json:"subject"`
-	ReceivedAt int64          `json:"received_at"`
-	TextBody   sql.NullString `json:"text_body"`
-	HtmlBody   sql.NullString `json:"html_body"`
-	Size       int64          `json:"size"`
+	MailboxID      int64          `json:"mailbox_id"`
+	MessageID      sql.NullString `json:"message_id"`
+	FromAddr       string         `json:"from_addr"`
+	ToAddr         string         `json:"to_addr"`
+	Subject        sql.NullString `json:"subject"`
+	ReceivedAt     int64          `json:"received_at"`
+	TextBody       sql.NullString `json:"text_body"`
+	HtmlBody       sql.NullString `json:"html_body"`
+	Size           int64          `json:"size"`
+	RawStoragePath sql.NullString `json:"raw_storage_path"`
 }
 
 func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error) {
@@ -101,6 +102,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		arg.TextBody,
 		arg.HtmlBody,
 		arg.Size,
+		arg.RawStoragePath,
 	)
 	var i Message
 	err := row.Scan(
@@ -115,6 +117,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.HtmlBody,
 		&i.Size,
 		&i.IsRead,
+		&i.RawStoragePath,
 	)
 	return i, err
 }
@@ -128,8 +131,62 @@ func (q *Queries) DeleteMessage(ctx context.Context, id int64) error {
 	return err
 }
 
+const findLatestUnreadMessagesForCode = `-- name: FindLatestUnreadMessagesForCode :many
+SELECT
+    id, mailbox_id, message_id, from_addr, to_addr, subject,
+    received_at, text_body, html_body, size, is_read, raw_storage_path
+FROM messages
+WHERE is_read = 0
+  AND lower(to_addr) LIKE ?
+  AND lower(from_addr) LIKE ?
+ORDER BY received_at DESC
+LIMIT ?
+`
+
+type FindLatestUnreadMessagesForCodeParams struct {
+	ToAddr   string `json:"to_addr"`
+	FromAddr string `json:"from_addr"`
+	Limit    int64  `json:"limit"`
+}
+
+func (q *Queries) FindLatestUnreadMessagesForCode(ctx context.Context, arg FindLatestUnreadMessagesForCodeParams) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, findLatestUnreadMessagesForCode, arg.ToAddr, arg.FromAddr, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Message{}
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.MailboxID,
+			&i.MessageID,
+			&i.FromAddr,
+			&i.ToAddr,
+			&i.Subject,
+			&i.ReceivedAt,
+			&i.TextBody,
+			&i.HtmlBody,
+			&i.Size,
+			&i.IsRead,
+			&i.RawStoragePath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMessageByID = `-- name: GetMessageByID :one
-SELECT id, mailbox_id, message_id, from_addr, to_addr, subject, received_at, text_body, html_body, size, is_read FROM messages WHERE id = ? LIMIT 1
+SELECT id, mailbox_id, message_id, from_addr, to_addr, subject, received_at, text_body, html_body, size, is_read, raw_storage_path FROM messages WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetMessageByID(ctx context.Context, id int64) (Message, error) {
@@ -147,6 +204,7 @@ func (q *Queries) GetMessageByID(ctx context.Context, id int64) (Message, error)
 		&i.HtmlBody,
 		&i.Size,
 		&i.IsRead,
+		&i.RawStoragePath,
 	)
 	return i, err
 }

@@ -79,6 +79,7 @@ export interface Attachment {
 export interface MessageDetail extends MessageSummary {
   text_body: string;
   html_body: string;
+  has_raw: boolean;
   attachments: Attachment[];
 }
 
@@ -100,12 +101,14 @@ export interface SystemConfig {
   session_secret_set: boolean;
   admin_username: string;
   admin_password_set: boolean;
+  admin_api_key: string;
   editable: {
     ingest_token: boolean;
     ingest_secret: boolean;
     session_secret: boolean;
     admin_username: boolean;
     admin_password: boolean;
+    admin_api_key: boolean;
   };
 }
 
