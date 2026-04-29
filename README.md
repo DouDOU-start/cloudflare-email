@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/maste
 
 ```text
 /opt/cf-email/cf-email              # 后端二进制
-/opt/cf-email/config.yaml           # 配置和密钥
+/opt/cf-email/data/config.yaml      # 配置和密钥
 /opt/cf-email/data/email.db          # SQLite 数据库
 /opt/cf-email/storage/               # 附件
 /etc/systemd/system/cf-email.service # systemd 服务
@@ -126,7 +126,7 @@ curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/maste
 备份配置和数据：
 
 ```bash
-sudo cp /opt/cf-email/config.yaml ./config.yaml.backup
+sudo cp /opt/cf-email/data/config.yaml ./config.yaml.backup
 sudo tar -czf cf-email-data.tar.gz -C /opt cf-email
 ```
 

@@ -7,6 +7,7 @@ APP_NAME="cf-email"
 SERVICE_NAME="cf-email"
 INSTALL_DIR="${CF_EMAIL_INSTALL_DIR:-${INSTALL_DIR:-/opt/cf-email}}"
 CONFIG_FILE=""
+LEGACY_CONFIG_FILE=""
 DATA_DIR=""
 STORAGE_DIR=""
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
@@ -32,8 +33,9 @@ die() { printf '[%s] 错误: %s\n' "$APP_NAME" "$*" >&2; exit 1; }
 
 set_layout_paths() {
   INSTALL_DIR="${INSTALL_DIR%/}"
-  CONFIG_FILE="${INSTALL_DIR}/config.yaml"
   DATA_DIR="${INSTALL_DIR}/data"
+  CONFIG_FILE="${DATA_DIR}/config.yaml"
+  LEGACY_CONFIG_FILE="${INSTALL_DIR}/config.yaml"
   STORAGE_DIR="${INSTALL_DIR}/storage"
 }
 
@@ -378,6 +380,30 @@ prepare_dirs() {
   install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "$STORAGE_DIR"
 }
 
+existing_service_config_file() {
+  [[ -f "$SERVICE_FILE" ]] || return
+  grep -m1 '^Environment=CONFIG_PATH=' "$SERVICE_FILE" | cut -d '=' -f3-
+}
+
+migrate_config() {
+  local source_config
+  source_config="$(existing_service_config_file)"
+
+  if [[ -f "$CONFIG_FILE" ]]; then
+    chown "$SERVICE_NAME":"$SERVICE_NAME" "$CONFIG_FILE"
+    chmod 0640 "$CONFIG_FILE"
+    return
+  fi
+
+  if [[ -z "$source_config" || ! -f "$source_config" ]]; then
+    source_config="$LEGACY_CONFIG_FILE"
+  fi
+  [[ -f "$source_config" ]] || return
+
+  install -m 0640 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "$source_config" "$CONFIG_FILE"
+  log "已迁移配置: ${source_config} -> ${CONFIG_FILE}"
+}
+
 download_release() {
   local version="$1"
   local arch="$2"
@@ -460,7 +486,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=${INSTALL_DIR} ${DATA_DIR} ${STORAGE_DIR}
+ReadWritePaths=${DATA_DIR} ${STORAGE_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -557,6 +583,7 @@ do_install() {
   collect_config
   create_user
   prepare_dirs
+  migrate_config
 
   local version arch tmpdir
   version="$(resolve_version)"
@@ -576,6 +603,10 @@ do_install() {
 do_upgrade() {
   check_system
   [[ -x "${INSTALL_DIR}/cf-email" ]] || die "cf-email 尚未安装"
+  create_user
+  prepare_dirs
+  migrate_config
+  [[ -f "$CONFIG_FILE" ]] || die "找不到现有配置文件；请确认 ${CONFIG_FILE} 或 ${LEGACY_CONFIG_FILE} 存在"
 
   local version arch tmpdir previous
   version="$(resolve_version)"
@@ -587,6 +618,7 @@ do_upgrade() {
   download_release "$version" "$arch" "$tmpdir"
   cp "${INSTALL_DIR}/cf-email" "$previous"
   install -m 0755 "${tmpdir}/cf-email" "${INSTALL_DIR}/cf-email"
+  write_service
   systemctl restart "$SERVICE_NAME"
   if ! verify_service; then
     cp "$previous" "${INSTALL_DIR}/cf-email"
