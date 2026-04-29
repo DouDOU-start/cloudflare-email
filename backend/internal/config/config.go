@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -86,6 +88,12 @@ func Load() (*Config, error) {
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, fmt.Errorf("read %s: %w", path, err)
+	} else {
+		var err error
+		fc, err = initConfigFile(path)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	c := &Config{
@@ -119,6 +127,49 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("admin.username/admin.password must be set in %s or ADMIN_USERNAME/ADMIN_PASSWORD env", path)
 	}
 	return c, nil
+}
+
+func initConfigFile(path string) (fileConfig, error) {
+	var fc fileConfig
+	fc.BindAddr = ":8080"
+	fc.PublicBaseURL = "http://localhost:8080"
+	fc.DBPath = "./data/email.db"
+	fc.StorageDir = "./data/storage"
+	fc.Admin.Username = "admin"
+	fc.Admin.Password = "admin"
+
+	var err error
+	if fc.IngestToken, err = randomHex(32); err != nil {
+		return fileConfig{}, err
+	}
+	if fc.IngestSecret, err = randomHex(32); err != nil {
+		return fileConfig{}, err
+	}
+	if fc.SessionSecret, err = randomHex(32); err != nil {
+		return fileConfig{}, err
+	}
+
+	if dir := filepath.Dir(path); dir != "." {
+		if err := os.MkdirAll(dir, 0o750); err != nil {
+			return fileConfig{}, fmt.Errorf("create config dir: %w", err)
+		}
+	}
+	out, err := yaml.Marshal(&fc)
+	if err != nil {
+		return fileConfig{}, fmt.Errorf("marshal initial config: %w", err)
+	}
+	if err := atomicWriteFile(path, out, 0o600); err != nil {
+		return fileConfig{}, err
+	}
+	return fc, nil
+}
+
+func randomHex(bytes int) (string, error) {
+	b := make([]byte, bytes)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate secret: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
 
 func NewStore(cfg *Config) *Store {
