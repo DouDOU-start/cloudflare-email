@@ -264,6 +264,40 @@ normalize_base_url() {
   printf '%s' "$value"
 }
 
+is_ipv4() {
+  local value="$1" octet
+  [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || return 1
+  IFS=. read -r -a octets <<<"$value"
+  for octet in "${octets[@]}"; do
+    (( octet >= 0 && octet <= 255 )) || return 1
+  done
+}
+
+detect_public_ip() {
+  local endpoint value
+  for endpoint in \
+    https://api.ipify.org \
+    https://ifconfig.me/ip \
+    https://checkip.amazonaws.com
+  do
+    value="$(curl -fsS --max-time 5 "$endpoint" 2>/dev/null | tr -d '[:space:]' || true)"
+    if is_ipv4 "$value"; then
+      printf '%s' "$value"
+      return
+    fi
+  done
+}
+
+default_public_base_url() {
+  local public_ip
+  public_ip="$(detect_public_ip)"
+  if [[ -n "$public_ip" ]]; then
+    printf 'http://%s:%s' "$public_ip" "$PORT"
+    return
+  fi
+  printf 'http://localhost:%s' "$PORT"
+}
+
 validate_port() {
   local value="$1"
   [[ "$value" =~ ^[0-9]+$ ]] || die "端口必须是数字"
@@ -311,7 +345,7 @@ collect_config() {
   collect_port
 
   if [[ -z "$PUBLIC_BASE_URL" ]]; then
-    PUBLIC_BASE_URL="http://localhost:${PORT}"
+    PUBLIC_BASE_URL="$(default_public_base_url)"
   fi
   PUBLIC_BASE_URL="$(normalize_base_url "$PUBLIC_BASE_URL")"
 
