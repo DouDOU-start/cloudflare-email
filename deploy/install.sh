@@ -205,7 +205,7 @@ yaml_quote() {
 
 collect_config() {
   if [[ -z "$PUBLIC_BASE_URL" ]]; then
-    PUBLIC_BASE_URL="$(prompt_value 'Public base URL, for example https://mail.example.com' "$DEFAULT_PUBLIC_BASE_URL")"
+    PUBLIC_BASE_URL="$DEFAULT_PUBLIC_BASE_URL"
   fi
   PUBLIC_BASE_URL="$(normalize_base_url "$PUBLIC_BASE_URL")"
 
