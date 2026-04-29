@@ -695,7 +695,6 @@ do_install() {
   collect_config
   create_user
   prepare_dirs
-  migrate_config
 
   local version arch tmpdir
   version="$(resolve_version)"
