@@ -5,10 +5,10 @@ REPO_OWNER="DouDOU-start"
 REPO_NAME="cloudflare-email"
 APP_NAME="cf-email"
 SERVICE_NAME="cf-email"
-INSTALL_DIR="/opt/cf-email"
-CONFIG_DIR="/etc/cf-email"
-DATA_DIR="/var/lib/cf-email"
-CONFIG_FILE="${CONFIG_DIR}/config.yaml"
+INSTALL_DIR="${CF_EMAIL_INSTALL_DIR:-${INSTALL_DIR:-/opt/cf-email}}"
+CONFIG_FILE=""
+DATA_DIR=""
+STORAGE_DIR=""
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 GITHUB_REPO="${REPO_OWNER}/${REPO_NAME}"
 GITHUB_API="https://api.github.com/repos/${GITHUB_REPO}"
@@ -24,15 +24,26 @@ TURNSTILE_SITE_KEY="${TURNSTILE_SITE_KEY:-}"
 TURNSTILE_SECRET_KEY="${TURNSTILE_SECRET_KEY:-}"
 ASSUME_YES=0
 PURGE=0
+INSTALL_DIR_SET=0
 
 log() { printf '[%s] %s\n' "$APP_NAME" "$*"; }
 die() { printf '[%s] ERROR: %s\n' "$APP_NAME" "$*" >&2; exit 1; }
 
+set_layout_paths() {
+  INSTALL_DIR="${INSTALL_DIR%/}"
+  CONFIG_FILE="${INSTALL_DIR}/config.yaml"
+  DATA_DIR="${INSTALL_DIR}/data"
+  STORAGE_DIR="${INSTALL_DIR}/storage"
+}
+
+set_layout_paths
+
 usage() {
   cat <<'EOF'
 Usage:
-  install.sh [install] [--public-base-url URL] [--version VERSION]
-  install.sh upgrade [--version VERSION]
+  install.sh [install] [--install-dir DIR] [--public-base-url URL] [--version VERSION]
+  install.sh upgrade [--install-dir DIR] [--version VERSION]
+  install.sh start|stop|pause|restart
   install.sh uninstall [-y] [--purge]
   install.sh status
   install.sh logs
@@ -40,8 +51,10 @@ Usage:
 
 Examples:
   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email
   sudo bash install.sh install --version v0.1.0
   sudo bash install.sh install --public-base-url https://mail.example.com
+  sudo bash install.sh restart
   sudo bash install.sh upgrade
   sudo bash install.sh uninstall -y
 EOF
@@ -50,7 +63,7 @@ EOF
 parse_args() {
   if [[ $# -gt 0 ]]; then
     case "$1" in
-      install|upgrade|update|uninstall|remove|status|logs|help|-h|--help)
+      install|upgrade|update|uninstall|remove|start|stop|pause|restart|status|logs|help|-h|--help)
         COMMAND="$1"
         shift
         ;;
@@ -81,6 +94,19 @@ parse_args() {
         ;;
       --domain=*|--public-base-url=*)
         PUBLIC_BASE_URL="${1#*=}"
+        shift
+        ;;
+      --install-dir|--dir)
+        [[ $# -ge 2 ]] || die "$1 requires a value"
+        INSTALL_DIR="$2"
+        INSTALL_DIR_SET=1
+        set_layout_paths
+        shift 2
+        ;;
+      --install-dir=*|--dir=*)
+        INSTALL_DIR="${1#*=}"
+        INSTALL_DIR_SET=1
+        set_layout_paths
         shift
         ;;
       -y|--yes)
@@ -132,6 +158,39 @@ check_system() {
   require_command tar
   require_command sha256sum
   require_command systemctl
+}
+
+validate_install_dir() {
+  [[ -n "$INSTALL_DIR" ]] || die "install dir is required"
+  [[ "$INSTALL_DIR" == /* ]] || die "install dir must be an absolute path"
+  [[ "$INSTALL_DIR" != "/" ]] || die "install dir cannot be /"
+  [[ "$INSTALL_DIR" != *[[:space:]]* ]] || die "install dir cannot contain whitespace"
+  set_layout_paths
+}
+
+resolve_existing_install_dir() {
+  [[ -f "$SERVICE_FILE" ]] || return
+  local exec_start
+  exec_start="$(grep -m1 '^ExecStart=' "$SERVICE_FILE" | cut -d '=' -f2-)"
+  [[ -n "$exec_start" ]] || return
+  [[ "${exec_start##*/}" == "cf-email" ]] || return
+  INSTALL_DIR="${exec_start%/cf-email}"
+  set_layout_paths
+}
+
+prepare_layout() {
+  if [[ "$COMMAND" == "install" ]]; then
+    if [[ "$INSTALL_DIR_SET" -eq 0 ]]; then
+      INSTALL_DIR="$(prompt_value 'Install directory' "$INSTALL_DIR")"
+    fi
+    validate_install_dir
+    return
+  fi
+
+  if [[ "$INSTALL_DIR_SET" -eq 0 ]]; then
+    resolve_existing_install_dir
+  fi
+  validate_install_dir
 }
 
 detect_arch() {
@@ -228,16 +287,14 @@ create_user() {
     groupadd --system "$SERVICE_NAME"
   fi
   if ! id -u "$SERVICE_NAME" >/dev/null 2>&1; then
-    useradd --system --gid "$SERVICE_NAME" --home-dir "$DATA_DIR" --shell /usr/sbin/nologin "$SERVICE_NAME"
+    useradd --system --gid "$SERVICE_NAME" --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin "$SERVICE_NAME"
   fi
 }
 
 prepare_dirs() {
   install -d -m 0755 "$INSTALL_DIR"
-  install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "$CONFIG_DIR"
   install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "$DATA_DIR"
-  install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "${DATA_DIR}/data"
-  install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "${DATA_DIR}/storage"
+  install -d -m 0750 -o "$SERVICE_NAME" -g "$SERVICE_NAME" "$STORAGE_DIR"
 }
 
 download_release() {
@@ -283,8 +340,8 @@ write_config() {
   cat >"$CONFIG_FILE" <<EOF
 bind_addr: ":8080"
 public_base_url: $(yaml_quote "$PUBLIC_BASE_URL")
-db_path: $(yaml_quote "${DATA_DIR}/data/email.db")
-storage_dir: $(yaml_quote "${DATA_DIR}/storage")
+db_path: $(yaml_quote "${DATA_DIR}/email.db")
+storage_dir: $(yaml_quote "$STORAGE_DIR")
 
 ingest_token: $(yaml_quote "$ingest_token")
 ingest_secret: $(yaml_quote "$ingest_secret")
@@ -313,7 +370,7 @@ Wants=network-online.target
 Type=simple
 User=${SERVICE_NAME}
 Group=${SERVICE_NAME}
-WorkingDirectory=${DATA_DIR}
+WorkingDirectory=${INSTALL_DIR}
 Environment=CONFIG_PATH=${CONFIG_FILE}
 ExecStart=${INSTALL_DIR}/cf-email
 Restart=on-failure
@@ -322,7 +379,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=${CONFIG_DIR} ${DATA_DIR}
+ReadWritePaths=${CONFIG_FILE} ${DATA_DIR} ${STORAGE_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -370,6 +427,8 @@ print_summary() {
 
 cf-email installed successfully.
 
+Install directory: ${INSTALL_DIR}
+Config file: ${CONFIG_FILE}
 Admin URL: ${public_base_url}/admin
 Admin username: ${admin_username}
 Admin password: ${admin_password}
@@ -382,8 +441,11 @@ INGEST_SECRET=${ingest_secret}
 Deploy the Worker separately with wrangler after setting these secrets.
 
 Commands:
-systemctl status cf-email
-journalctl -u cf-email -f
+sudo bash install.sh start
+sudo bash install.sh stop
+sudo bash install.sh restart
+sudo bash install.sh status
+sudo bash install.sh logs
 EOF
 }
 
@@ -400,7 +462,7 @@ do_install() {
   version="$(resolve_version)"
   arch="$(detect_arch)"
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' RETURN
+  trap 'rm -rf "$tmpdir"; trap - RETURN' RETURN
 
   download_release "$version" "$arch" "$tmpdir"
   install_binary "${tmpdir}/cf-email"
@@ -420,7 +482,7 @@ do_upgrade() {
   arch="$(detect_arch)"
   tmpdir="$(mktemp -d)"
   previous="${INSTALL_DIR}/cf-email.backup.$(date +%Y%m%d%H%M%S)"
-  trap 'rm -rf "$tmpdir"' RETURN
+  trap 'rm -rf "$tmpdir"; trap - RETURN' RETURN
 
   download_release "$version" "$arch" "$tmpdir"
   cp "${INSTALL_DIR}/cf-email" "$previous"
@@ -451,16 +513,28 @@ do_uninstall() {
   systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
   rm -f "$SERVICE_FILE"
   systemctl daemon-reload
-  rm -rf "$INSTALL_DIR"
+  rm -f "${INSTALL_DIR}/cf-email" "${INSTALL_DIR}"/cf-email.backup.*
 
   if [[ "$PURGE" -eq 1 ]]; then
-    rm -rf "$CONFIG_DIR" "$DATA_DIR"
+    rm -rf "$INSTALL_DIR"
     userdel "$SERVICE_NAME" >/dev/null 2>&1 || true
     groupdel "$SERVICE_NAME" >/dev/null 2>&1 || true
-    log "uninstalled and purged config/data"
+    log "uninstalled and purged ${INSTALL_DIR}"
   else
-    log "uninstalled; config and data kept at ${CONFIG_DIR} and ${DATA_DIR}"
+    log "uninstalled; config and data kept at ${INSTALL_DIR}"
   fi
+}
+
+do_start() {
+  systemctl enable --now "$SERVICE_NAME"
+}
+
+do_stop() {
+  systemctl stop "$SERVICE_NAME"
+}
+
+do_restart() {
+  systemctl restart "$SERVICE_NAME"
 }
 
 do_status() {
@@ -478,11 +552,15 @@ main() {
     exit 0
   fi
   ensure_root "$@"
+  prepare_layout
 
   case "$COMMAND" in
     install) do_install ;;
     upgrade) do_upgrade ;;
     uninstall) do_uninstall ;;
+    start) do_start ;;
+    stop|pause) do_stop ;;
+    restart) do_restart ;;
     status) do_status ;;
     logs) do_logs ;;
     *) die "unknown command: ${COMMAND}" ;;

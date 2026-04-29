@@ -36,13 +36,19 @@ sender -> Cloudflare Email Routing -> Worker -> Go backend
 curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash
 ```
 
-安装后主要文件：
+默认安装到 `/opt/cf-email`，也可以安装时指定目录：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email
+```
+
+安装后主要文件会放在同一个程序目录下：
 
 ```text
 /opt/cf-email/cf-email              # 后端二进制
-/etc/cf-email/config.yaml           # 配置和密钥
-/var/lib/cf-email/data/email.db      # SQLite 数据库
-/var/lib/cf-email/storage/           # 附件
+/opt/cf-email/config.yaml           # 配置和密钥
+/opt/cf-email/data/email.db          # SQLite 数据库
+/opt/cf-email/storage/               # 附件
 /etc/systemd/system/cf-email.service # systemd 服务
 ```
 
@@ -105,6 +111,9 @@ make worker-deploy # 部署 Cloudflare Worker
 ## 运维
 
 ```bash
+sudo bash deploy/install.sh start
+sudo bash deploy/install.sh stop
+sudo bash deploy/install.sh restart
 sudo bash deploy/install.sh status
 sudo bash deploy/install.sh logs
 sudo bash deploy/install.sh upgrade
@@ -112,13 +121,13 @@ sudo bash deploy/install.sh uninstall -y
 sudo bash deploy/install.sh uninstall --purge -y
 ```
 
-`uninstall` 默认保留配置和数据，`--purge` 会删除 `/etc/cf-email` 和 `/var/lib/cf-email`。
+`pause` 是 `stop` 的别名。`uninstall` 默认只移除服务和二进制，保留程序目录中的配置和数据；`--purge` 会删除整个程序目录。
 
 备份配置和数据：
 
 ```bash
-sudo cp /etc/cf-email/config.yaml ./config.yaml.backup
-sudo tar -czf cf-email-data.tar.gz -C /var/lib cf-email
+sudo cp /opt/cf-email/config.yaml ./config.yaml.backup
+sudo tar -czf cf-email-data.tar.gz -C /opt cf-email
 ```
 
 ## 安全模型
