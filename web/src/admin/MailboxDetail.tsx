@@ -49,6 +49,22 @@ export default function MailboxDetail() {
     },
   });
 
+  const refreshReadState = () => {
+    qc.invalidateQueries({ queryKey: ["mailboxes"] });
+    qc.invalidateQueries({ queryKey: ["messages"] });
+    qc.invalidateQueries({ queryKey: ["mailbox-messages", mailboxID] });
+  };
+
+  const markMailboxRead = useMutation({
+    mutationFn: () => api.post(`/api/admin/mailboxes/${mailboxID}/read`),
+    onSuccess: refreshReadState,
+  });
+
+  const markMessageRead = useMutation({
+    mutationFn: (messageID: number) => api.post(`/api/admin/messages/${messageID}/read`),
+    onSuccess: refreshReadState,
+  });
+
   if (!mailbox && !mailboxes.isLoading) {
     return <EmptyState title="未找到邮箱" />;
   }
@@ -75,6 +91,9 @@ export default function MailboxDetail() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" disabled={!mailbox?.unread_count || markMailboxRead.isPending} onClick={() => markMailboxRead.mutate()}>
+            {markMailboxRead.isPending ? "处理中..." : "全部已读"}
+          </Button>
           <Button variant="secondary" onClick={() => setShowTokenForm((v) => !v)}>
             创建只读链接
           </Button>
@@ -115,6 +134,7 @@ export default function MailboxDetail() {
                 <th className={tableHeaderCellClass}>主题</th>
                 <th className={tableHeaderCellClass}>接收时间</th>
                 <th className={tableHeaderCellClass}>大小</th>
+                <th className="w-28 px-3 py-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -132,6 +152,13 @@ export default function MailboxDetail() {
                   </td>
                   <td className={`${tableCellClass} font-mono-display text-xs text-muted-foreground`}>{formatDate(m.received_at)}</td>
                   <td className={`${tableCellClass} num font-mono-display text-xs text-muted-foreground`}>{formatBytes(m.size)}</td>
+                  <td className={`${tableCellClass} text-right`}>
+                    {!m.is_read && (
+                      <Button type="button" size="sm" variant="ghost" disabled={markMessageRead.isPending} onClick={() => markMessageRead.mutate(m.id)}>
+                        已读
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

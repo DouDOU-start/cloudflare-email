@@ -193,6 +193,27 @@ func (s *Server) handleMarkRead(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+func (s *Server) handleMarkAllRead(w http.ResponseWriter, r *http.Request) {
+	if err := s.Queries.MarkAllMessagesRead(r.Context()); err != nil {
+		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) handleMarkMailboxRead(w http.ResponseWriter, r *http.Request) {
+	id, err := httpapi.PathInt64(r, "id")
+	if err != nil {
+		httpapi.WriteJSON(w, http.StatusBadRequest, httpapi.Error{Error: "bad id"})
+		return
+	}
+	if err := s.Queries.MarkMailboxMessagesRead(r.Context(), id); err != nil {
+		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func (s *Server) handleDeleteMessage(w http.ResponseWriter, r *http.Request) {
 	id, err := httpapi.PathInt64(r, "id")
 	if err != nil {

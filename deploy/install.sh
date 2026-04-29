@@ -65,7 +65,7 @@ usage() {
 用法:
   install.sh [install] [--install-dir DIR] [--port PORT] [--version VERSION]
   install.sh upgrade [--install-dir DIR] [--version VERSION]
-  install.sh start|stop|pause|restart
+  install.sh start|stop|restart
   install.sh uninstall [-y] [--purge]
   install.sh status
   install.sh logs
@@ -84,7 +84,7 @@ EOF
 parse_args() {
   if [[ $# -gt 0 ]]; then
     case "$1" in
-      install|upgrade|update|uninstall|remove|start|stop|pause|restart|status|logs|help|-h|--help)
+      install|upgrade|update|uninstall|remove|start|stop|restart|status|logs|help|-h|--help)
         COMMAND="$1"
         shift
         ;;
@@ -531,7 +531,7 @@ usage() {
   cat <<'HELP'
 用法:
   cf-email start
-  cf-email stop|pause
+  cf-email stop
   cf-email restart
   cf-email status
   cf-email logs [journalctl 参数]
@@ -566,7 +566,7 @@ case "\$command" in
     ensure_root "\$command" "\$@"
     systemctl enable --now "\$SERVICE_NAME"
     ;;
-  stop|pause)
+  stop)
     ensure_root "\$command" "\$@"
     systemctl stop "\$SERVICE_NAME"
     ;;
@@ -841,7 +841,7 @@ main() {
     upgrade) do_upgrade ;;
     uninstall) do_uninstall ;;
     start) do_start ;;
-    stop|pause) do_stop ;;
+    stop) do_stop ;;
     restart) do_restart ;;
     status) do_status ;;
     logs) do_logs ;;

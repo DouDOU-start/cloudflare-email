@@ -47,6 +47,12 @@ SELECT COUNT(*) FROM messages WHERE mailbox_id = ? AND is_read = 0;
 -- name: MarkMessageRead :exec
 UPDATE messages SET is_read = 1 WHERE id = ?;
 
+-- name: MarkAllMessagesRead :exec
+UPDATE messages SET is_read = 1 WHERE is_read = 0;
+
+-- name: MarkMailboxMessagesRead :exec
+UPDATE messages SET is_read = 1 WHERE mailbox_id = ? AND is_read = 0;
+
 -- name: FindLatestUnreadMessagesForCode :many
 SELECT
     id, mailbox_id, message_id, from_addr, to_addr, subject,

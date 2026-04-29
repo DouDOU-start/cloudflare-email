@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api, pagingQuery, type Mailbox, type MessageSummary, type Paged } from "@/lib/api";
@@ -42,6 +42,7 @@ export default function Mailboxes() {
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [query, setQuery] = useState("");
   const [readFilter, setReadFilter] = useState("all");
+  const qc = useQueryClient();
 
   const mailboxesQuery = useQuery<Mailbox[]>({
     queryKey: ["mailboxes"],
@@ -57,6 +58,22 @@ export default function Mailboxes() {
   const messagesQuery = useQuery<Paged<MessageSummary>>({
     queryKey: ["messages", page, pageSize, searchText, readFilter],
     queryFn: () => api.get<Paged<MessageSummary>>(`/api/admin/messages?${messageParams}`),
+  });
+
+  const refreshReadState = () => {
+    qc.invalidateQueries({ queryKey: ["mailboxes"] });
+    qc.invalidateQueries({ queryKey: ["messages"] });
+    qc.invalidateQueries({ queryKey: ["mailbox-messages"] });
+  };
+
+  const markAllRead = useMutation({
+    mutationFn: () => api.post("/api/admin/messages/read"),
+    onSuccess: refreshReadState,
+  });
+
+  const markMessageRead = useMutation({
+    mutationFn: (messageID: number) => api.post(`/api/admin/messages/${messageID}/read`),
+    onSuccess: refreshReadState,
   });
 
   const mailboxes = mailboxesQuery.data ?? [];
@@ -113,6 +130,9 @@ export default function Mailboxes() {
               <Button type="button" variant={!isMessageView ? "primary" : "secondary"} onClick={() => setMode("mailboxes")}>
                 邮箱分组
               </Button>
+              <Button type="button" variant="secondary" disabled={unreadMessages === 0 || markAllRead.isPending} onClick={() => markAllRead.mutate()}>
+                {markAllRead.isPending ? "处理中..." : "全部已读"}
+              </Button>
             </div>
             <div className="grid gap-3 md:col-span-2 md:grid-cols-[minmax(220px,1fr)_160px]">
               <Field label="模糊搜索" className="space-y-1.5">
@@ -152,6 +172,7 @@ export default function Mailboxes() {
                     <th className={tableHeaderCellClass}>发件人</th>
                     <th className={tableHeaderCellClass}>收件邮箱</th>
                     <th className={tableHeaderCellClass}>接收时间</th>
+                    <th className="w-28 px-3 py-3 text-right">操作</th>
                     <th className="w-10 px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -176,6 +197,13 @@ export default function Mailboxes() {
                           </Link>
                         </td>
                         <td className={`${tableCellClass} whitespace-nowrap font-mono-display text-xs text-muted-foreground`}>{formatDate(m.received_at)}</td>
+                        <td className={`${tableCellClass} text-right`}>
+                          {!m.is_read && (
+                            <Button type="button" size="sm" variant="ghost" disabled={markMessageRead.isPending} onClick={() => markMessageRead.mutate(m.id)}>
+                              已读
+                            </Button>
+                          )}
+                        </td>
                         <td className="w-10 px-3 py-3 text-right text-muted-foreground transition-colors group-hover:text-accent">
                           <Link to={`/admin/messages/${m.id}`} aria-label="打开邮件">
                             {Icon.arrow}

@@ -33,6 +33,7 @@ type Server struct {
 }
 
 type emailCodeRequest struct {
+	Platform     string `json:"platform"`
 	Recipient    string `json:"recipient"`
 	SenderSuffix string `json:"sender_suffix"`
 	MarkRead     *bool  `json:"mark_read,omitempty"`
@@ -92,6 +93,12 @@ func (s *Server) handleEmailCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	platform := normalizePlatform(req.Platform)
+	if !isValidPlatform(platform) {
+		httpapi.WriteJSON(w, http.StatusBadRequest, httpapi.Error{Error: "invalid platform"})
+		return
+	}
+
 	recipient := normalizeEmail(req.Recipient)
 	if !isValidEmail(recipient) {
 		httpapi.WriteJSON(w, http.StatusBadRequest, httpapi.Error{Error: "invalid recipient"})
@@ -120,7 +127,7 @@ func (s *Server) handleEmailCode(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		code, ok := ExtractVerificationCode(m.Subject.String, m.TextBody.String, m.HtmlBody.String)
+		code, ok := ExtractVerificationCode(platform, m.Subject.String, m.TextBody.String, m.HtmlBody.String)
 		if !ok {
 			continue
 		}
@@ -156,6 +163,14 @@ func bearerToken(header string) string {
 		return ""
 	}
 	return strings.TrimSpace(header[len(prefix):])
+}
+
+func normalizePlatform(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func isValidPlatform(value string) bool {
+	return value == "openai"
 }
 
 func normalizeEmail(value string) string {

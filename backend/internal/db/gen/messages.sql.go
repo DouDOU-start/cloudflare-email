@@ -355,6 +355,24 @@ func (q *Queries) ListMessagesByMailbox(ctx context.Context, arg ListMessagesByM
 	return items, nil
 }
 
+const markAllMessagesRead = `-- name: MarkAllMessagesRead :exec
+UPDATE messages SET is_read = 1 WHERE is_read = 0
+`
+
+func (q *Queries) MarkAllMessagesRead(ctx context.Context) error {
+	_, err := q.db.ExecContext(ctx, markAllMessagesRead)
+	return err
+}
+
+const markMailboxMessagesRead = `-- name: MarkMailboxMessagesRead :exec
+UPDATE messages SET is_read = 1 WHERE mailbox_id = ? AND is_read = 0
+`
+
+func (q *Queries) MarkMailboxMessagesRead(ctx context.Context, mailboxID int64) error {
+	_, err := q.db.ExecContext(ctx, markMailboxMessagesRead, mailboxID)
+	return err
+}
+
 const markMessageRead = `-- name: MarkMessageRead :exec
 UPDATE messages SET is_read = 1 WHERE id = ?
 `

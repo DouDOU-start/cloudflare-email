@@ -70,8 +70,10 @@ func (s *Server) Routes() http.Handler {
 		r.Patch("/mailboxes/{id}", s.handleUpdateMailbox)
 		r.Delete("/mailboxes/{id}", s.handleDeleteMailbox)
 		r.Get("/mailboxes/{id}/messages", s.handleListMailboxMessages)
+		r.Post("/mailboxes/{id}/read", s.handleMarkMailboxRead)
 
 		r.Get("/messages", s.handleListMessages)
+		r.Post("/messages/read", s.handleMarkAllRead)
 		r.Get("/messages/{id}", s.handleGetMessage)
 		r.Get("/messages/{id}/eml", s.handleDownloadMessageEML)
 		r.Post("/messages/{id}/read", s.handleMarkRead)
