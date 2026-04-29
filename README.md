@@ -49,6 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/maste
 /opt/cf-email/data/config.yaml      # 配置和密钥
 /opt/cf-email/data/email.db          # SQLite 数据库
 /opt/cf-email/storage/               # 附件
+/usr/local/bin/cf-email              # 管理命令
 /etc/systemd/system/cf-email.service # systemd 服务
 ```
 
@@ -111,17 +112,17 @@ make worker-deploy # 部署 Cloudflare Worker
 ## 运维
 
 ```bash
-sudo systemctl start cf-email
-sudo systemctl stop cf-email
-sudo systemctl restart cf-email
-sudo systemctl status cf-email
-sudo journalctl -u cf-email -f
-curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- upgrade
-curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- uninstall -y
-curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- uninstall --purge -y
+cf-email start
+cf-email stop
+cf-email restart
+cf-email status
+cf-email logs
+cf-email update
+cf-email uninstall -y
+cf-email uninstall --purge -y
 ```
 
-`pause` 是 `stop` 的别名。`uninstall` 默认只移除服务和二进制，保留程序目录中的配置和数据；`--purge` 会删除整个程序目录。
+`pause` 是 `stop` 的别名。`logs` 默认跟踪最近 200 行日志，也可以传入 `journalctl` 参数，例如 `cf-email logs -n 500 --no-pager`。`uninstall` 默认只移除服务、二进制和管理命令，保留程序目录中的配置和数据；`--purge` 会删除整个程序目录。
 
 备份配置和数据：
 

@@ -11,9 +11,11 @@ LEGACY_CONFIG_FILE=""
 DATA_DIR=""
 STORAGE_DIR=""
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+COMMAND_FILE="/usr/local/bin/${APP_NAME}"
 GITHUB_REPO="${REPO_OWNER}/${REPO_NAME}"
 GITHUB_API="https://api.github.com/repos/${GITHUB_REPO}"
 GITHUB_RELEASES="https://github.com/${GITHUB_REPO}/releases/download"
+INSTALLER_URL="https://raw.githubusercontent.com/${GITHUB_REPO}/master/deploy/install.sh"
 DEFAULT_PORT="8080"
 
 COMMAND="install"
@@ -57,9 +59,9 @@ usage() {
   curl -fsSL https://raw.githubusercontent.com/DouDOU-start/cloudflare-email/master/deploy/install.sh | sudo bash -s -- --install-dir /srv/cf-email --port 8081
   sudo bash install.sh install --version v0.1.0
   sudo bash install.sh install --public-base-url https://mail.example.com
-  sudo systemctl restart cf-email
-  sudo bash install.sh upgrade
-  sudo bash install.sh uninstall -y
+  cf-email restart
+  cf-email update
+  cf-email uninstall -y
 EOF
 }
 
@@ -495,6 +497,115 @@ EOF
   systemctl daemon-reload
 }
 
+command_file_available() {
+  [[ ! -e "$COMMAND_FILE" && ! -L "$COMMAND_FILE" ]] && return 0
+  grep -q 'cf-email management command' "$COMMAND_FILE" 2>/dev/null && return 0
+  [[ -L "$COMMAND_FILE" && "$(readlink -f "$COMMAND_FILE")" == "${INSTALL_DIR}/cf-email" ]]
+}
+
+write_command() {
+  command_file_available || die "${COMMAND_FILE} 已存在且不是 cf-email 管理命令"
+  [[ -L "$COMMAND_FILE" ]] && rm -f "$COMMAND_FILE"
+  cat >"$COMMAND_FILE" <<EOF
+#!/usr/bin/env bash
+# cf-email management command
+set -Eeuo pipefail
+
+APP_NAME="${APP_NAME}"
+SERVICE_NAME="${SERVICE_NAME}"
+INSTALL_DIR="${INSTALL_DIR}"
+INSTALLER_URL="${INSTALLER_URL}"
+
+die() { printf '[%s] 错误: %s\n' "\$APP_NAME" "\$*" >&2; exit 1; }
+
+usage() {
+  cat <<'HELP'
+用法:
+  cf-email start
+  cf-email stop|pause
+  cf-email restart
+  cf-email status
+  cf-email logs [journalctl 参数]
+  cf-email update [--version VERSION]
+  cf-email uninstall [-y] [--purge]
+  cf-email help
+HELP
+}
+
+ensure_root() {
+  if [[ "\${EUID}" -eq 0 ]]; then
+    return
+  fi
+  command -v sudo >/dev/null 2>&1 || die "请使用 root 运行，或先安装 sudo"
+  exec sudo -E "\$0" "\$@"
+}
+
+run_installer() {
+  local action="\$1"
+  shift
+  command -v curl >/dev/null 2>&1 || die "缺少必需命令: curl"
+  curl -fsSL "\$INSTALLER_URL" | bash -s -- "\$action" --install-dir "\$INSTALL_DIR" "\$@"
+}
+
+command="\${1:-help}"
+if [[ "\$#" -gt 0 ]]; then
+  shift
+fi
+
+case "\$command" in
+  start)
+    ensure_root "\$command" "\$@"
+    systemctl enable --now "\$SERVICE_NAME"
+    ;;
+  stop|pause)
+    ensure_root "\$command" "\$@"
+    systemctl stop "\$SERVICE_NAME"
+    ;;
+  restart)
+    ensure_root "\$command" "\$@"
+    systemctl restart "\$SERVICE_NAME"
+    ;;
+  status)
+    systemctl status "\$SERVICE_NAME" --no-pager
+    ;;
+  logs)
+    ensure_root "\$command" "\$@"
+    if [[ "\$#" -gt 0 ]]; then
+      journalctl -u "\$SERVICE_NAME" "\$@"
+    else
+      journalctl -u "\$SERVICE_NAME" -n 200 -f
+    fi
+    ;;
+  update|upgrade)
+    ensure_root "\$command" "\$@"
+    run_installer upgrade "\$@"
+    ;;
+  uninstall|remove)
+    ensure_root "\$command" "\$@"
+    run_installer uninstall "\$@"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage
+    die "未知命令: \${command}"
+    ;;
+esac
+EOF
+  chmod 0755 "$COMMAND_FILE"
+}
+
+remove_command() {
+  if [[ -f "$COMMAND_FILE" ]] && grep -q 'cf-email management command' "$COMMAND_FILE" 2>/dev/null; then
+    rm -f "$COMMAND_FILE"
+    return
+  fi
+  if [[ -L "$COMMAND_FILE" && "$(readlink -f "$COMMAND_FILE")" == "${INSTALL_DIR}/cf-email" ]]; then
+    rm -f "$COMMAND_FILE"
+  fi
+}
+
 start_service() {
   systemctl enable --now "$SERVICE_NAME"
 }
@@ -567,11 +678,12 @@ INGEST_SECRET=${ingest_secret}
 设置这些密钥后，请使用 wrangler 单独部署 Worker。
 
 常用命令:
-sudo systemctl start cf-email
-sudo systemctl stop cf-email
-sudo systemctl restart cf-email
-sudo systemctl status cf-email
-sudo journalctl -u cf-email -f
+cf-email start
+cf-email stop
+cf-email restart
+cf-email status
+cf-email logs
+cf-email update
 EOF
 }
 
@@ -595,6 +707,7 @@ do_install() {
   install_binary "${tmpdir}/cf-email"
   write_config
   write_service
+  write_command
   start_service
   verify_service || die "服务健康检查未通过"
   print_summary
@@ -619,6 +732,7 @@ do_upgrade() {
   cp "${INSTALL_DIR}/cf-email" "$previous"
   install -m 0755 "${tmpdir}/cf-email" "${INSTALL_DIR}/cf-email"
   write_service
+  write_command
   systemctl restart "$SERVICE_NAME"
   if ! verify_service; then
     cp "$previous" "${INSTALL_DIR}/cf-email"
@@ -644,6 +758,7 @@ do_uninstall() {
   confirm_uninstall
   systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
   rm -f "$SERVICE_FILE"
+  remove_command
   systemctl daemon-reload
   rm -f "${INSTALL_DIR}/cf-email" "${INSTALL_DIR}"/cf-email.backup.*
 
