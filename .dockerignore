@@ -1,0 +1,13 @@
+.git
+.github
+**/node_modules
+backend/bin
+backend/config.yaml
+backend/data
+web/dist
+worker/dist
+worker/.wrangler
+.env
+*.db
+*.db-shm
+*.db-wal
