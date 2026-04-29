@@ -13,6 +13,7 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 GITHUB_REPO="${REPO_OWNER}/${REPO_NAME}"
 GITHUB_API="https://api.github.com/repos/${GITHUB_REPO}"
 GITHUB_RELEASES="https://github.com/${GITHUB_REPO}/releases/download"
+DEFAULT_PUBLIC_BASE_URL="http://localhost:8080"
 
 COMMAND="install"
 VERSION=""
@@ -204,9 +205,8 @@ yaml_quote() {
 
 collect_config() {
   if [[ -z "$PUBLIC_BASE_URL" ]]; then
-    PUBLIC_BASE_URL="$(prompt_value 'Public base URL, for example https://mail.example.com' '')"
+    PUBLIC_BASE_URL="$(prompt_value 'Public base URL, for example https://mail.example.com' "$DEFAULT_PUBLIC_BASE_URL")"
   fi
-  [[ -n "$PUBLIC_BASE_URL" ]] || die "--public-base-url or PUBLIC_BASE_URL is required"
   PUBLIC_BASE_URL="$(normalize_base_url "$PUBLIC_BASE_URL")"
 
   ADMIN_USERNAME="$(prompt_value 'Admin username' "$ADMIN_USERNAME")"

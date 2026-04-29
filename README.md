@@ -86,7 +86,7 @@ TURNSTILE_SECRET_KEY=
 
 生产环境至少需要确认：
 
-- `PUBLIC_BASE_URL` 是公网 HTTPS 地址。
+- `PUBLIC_BASE_URL` 默认是 `http://localhost:8080`，生产环境建议改成公网 HTTPS 地址。
 - `INGEST_TOKEN` 和 `INGEST_SECRET` 与 Worker secrets 一致。
 - `SESSION_SECRET` 是稳定的长随机值。
 - `ADMIN_PASSWORD` 当前明文保存在配置中，需要保护配置文件权限。
