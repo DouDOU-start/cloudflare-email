@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db/gen"
@@ -29,7 +30,12 @@ type Server struct {
 // cookies still encode an int — we just always use 1.
 const configuredAdminID int64 = 1
 
-func (s *Server) secureCookie() bool { return !s.CookieInsecure }
+func (s *Server) secureCookie() bool {
+	if s.CookieInsecure {
+		return false
+	}
+	return !strings.HasPrefix(strings.ToLower(s.PublicBaseURL), "http://")
+}
 
 // Routes returns a chi router mounted under /api/admin.
 func (s *Server) Routes() http.Handler {
