@@ -32,9 +32,9 @@ func Open(ctx context.Context, path string) (*sql.DB, *gen.Queries, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("open sqlite: %w", err)
 	}
-	// SQLite has one writer; cap pool accordingly.
-	conn.SetMaxOpenConns(1)
-	conn.SetMaxIdleConns(1)
+	// WAL mode allows concurrent readers; keep writer serialized via busy_timeout.
+	conn.SetMaxOpenConns(4)
+	conn.SetMaxIdleConns(4)
 
 	if err := conn.PingContext(ctx); err != nil {
 		_ = conn.Close()

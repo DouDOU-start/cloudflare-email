@@ -63,7 +63,6 @@ export default function Mailboxes() {
   const refreshReadState = () => {
     qc.invalidateQueries({ queryKey: ["mailboxes"] });
     qc.invalidateQueries({ queryKey: ["messages"] });
-    qc.invalidateQueries({ queryKey: ["mailbox-messages"] });
   };
 
   const markAllRead = useMutation({

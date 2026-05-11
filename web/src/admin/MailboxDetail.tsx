@@ -51,7 +51,6 @@ export default function MailboxDetail() {
 
   const refreshReadState = () => {
     qc.invalidateQueries({ queryKey: ["mailboxes"] });
-    qc.invalidateQueries({ queryKey: ["messages"] });
     qc.invalidateQueries({ queryKey: ["mailbox-messages", mailboxID] });
   };
 

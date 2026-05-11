@@ -10,44 +10,6 @@ import (
 	"database/sql"
 )
 
-const countMessages = `-- name: CountMessages :one
-SELECT COUNT(*)
-FROM messages
-JOIN mailboxes ON mailboxes.id = messages.mailbox_id
-WHERE
-    (? = '' OR lower(messages.from_addr) LIKE ? OR lower(messages.to_addr) LIKE ? OR lower(messages.subject) LIKE ? OR lower(mailboxes.address) LIKE ? OR lower(mailboxes.note) LIKE ?)
-    AND (? = 'all' OR (? = 'unread' AND messages.is_read = 0) OR (? = 'read' AND messages.is_read = 1))
-`
-
-type CountMessagesParams struct {
-	Column1  interface{}    `json:"column_1"`
-	FromAddr string         `json:"from_addr"`
-	ToAddr   string         `json:"to_addr"`
-	Subject  sql.NullString `json:"subject"`
-	Address  string         `json:"address"`
-	Note     sql.NullString `json:"note"`
-	Column7  interface{}    `json:"column_7"`
-	Column8  interface{}    `json:"column_8"`
-	Column9  interface{}    `json:"column_9"`
-}
-
-func (q *Queries) CountMessages(ctx context.Context, arg CountMessagesParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countMessages,
-		arg.Column1,
-		arg.FromAddr,
-		arg.ToAddr,
-		arg.Subject,
-		arg.Address,
-		arg.Note,
-		arg.Column7,
-		arg.Column8,
-		arg.Column9,
-	)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const countMessagesByMailbox = `-- name: CountMessagesByMailbox :one
 SELECT COUNT(*) FROM messages WHERE mailbox_id = ?
 `
@@ -213,11 +175,12 @@ const listMessages = `-- name: ListMessages :many
 SELECT
     messages.id, messages.mailbox_id, messages.message_id, messages.from_addr,
     messages.to_addr, messages.subject, messages.received_at, messages.size,
-    messages.is_read
+    messages.is_read,
+    CAST(COUNT(*) OVER() AS INTEGER) AS total_count
 FROM messages
 JOIN mailboxes ON mailboxes.id = messages.mailbox_id
 WHERE
-    (? = '' OR lower(messages.from_addr) LIKE ? OR lower(messages.to_addr) LIKE ? OR lower(messages.subject) LIKE ? OR lower(mailboxes.address) LIKE ? OR lower(mailboxes.note) LIKE ?)
+    (? = '' OR messages.from_addr LIKE ? OR messages.to_addr LIKE ? OR messages.subject LIKE ? OR mailboxes.address LIKE ? OR mailboxes.note LIKE ?)
     AND (? = 'all' OR (? = 'unread' AND messages.is_read = 0) OR (? = 'read' AND messages.is_read = 1))
 ORDER BY messages.received_at DESC
 LIMIT ? OFFSET ?
@@ -247,6 +210,7 @@ type ListMessagesRow struct {
 	ReceivedAt int64          `json:"received_at"`
 	Size       int64          `json:"size"`
 	IsRead     int64          `json:"is_read"`
+	TotalCount int64          `json:"total_count"`
 }
 
 func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]ListMessagesRow, error) {
@@ -280,6 +244,7 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 			&i.ReceivedAt,
 			&i.Size,
 			&i.IsRead,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
@@ -297,7 +262,8 @@ func (q *Queries) ListMessages(ctx context.Context, arg ListMessagesParams) ([]L
 const listMessagesByMailbox = `-- name: ListMessagesByMailbox :many
 SELECT
     id, mailbox_id, message_id, from_addr, to_addr, subject,
-    received_at, size, is_read
+    received_at, size, is_read,
+    CAST(COUNT(*) OVER() AS INTEGER) AS total_count
 FROM messages
 WHERE mailbox_id = ?
 ORDER BY received_at DESC
@@ -320,6 +286,7 @@ type ListMessagesByMailboxRow struct {
 	ReceivedAt int64          `json:"received_at"`
 	Size       int64          `json:"size"`
 	IsRead     int64          `json:"is_read"`
+	TotalCount int64          `json:"total_count"`
 }
 
 func (q *Queries) ListMessagesByMailbox(ctx context.Context, arg ListMessagesByMailboxParams) ([]ListMessagesByMailboxRow, error) {
@@ -341,6 +308,7 @@ func (q *Queries) ListMessagesByMailbox(ctx context.Context, arg ListMessagesByM
 			&i.ReceivedAt,
 			&i.Size,
 			&i.IsRead,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
@@ -353,6 +321,53 @@ func (q *Queries) ListMessagesByMailbox(ctx context.Context, arg ListMessagesByM
 		return nil, err
 	}
 	return items, nil
+}
+
+const listStoragePathsByMailbox = `-- name: ListStoragePathsByMailbox :many
+SELECT raw_storage_path FROM messages
+WHERE mailbox_id = ? AND raw_storage_path IS NOT NULL AND raw_storage_path != ''
+`
+
+func (q *Queries) ListStoragePathsByMailbox(ctx context.Context, mailboxID int64) ([]sql.NullString, error) {
+	rows, err := q.db.QueryContext(ctx, listStoragePathsByMailbox, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []sql.NullString{}
+	for rows.Next() {
+		var raw_storage_path sql.NullString
+		if err := rows.Scan(&raw_storage_path); err != nil {
+			return nil, err
+		}
+		items = append(items, raw_storage_path)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const mailboxStats = `-- name: MailboxStats :one
+SELECT
+    CAST(COUNT(*) AS INTEGER) AS message_count,
+    CAST(COUNT(CASE WHEN is_read = 0 THEN 1 END) AS INTEGER) AS unread_count
+FROM messages WHERE mailbox_id = ?
+`
+
+type MailboxStatsRow struct {
+	MessageCount int64 `json:"message_count"`
+	UnreadCount  int64 `json:"unread_count"`
+}
+
+func (q *Queries) MailboxStats(ctx context.Context, mailboxID int64) (MailboxStatsRow, error) {
+	row := q.db.QueryRowContext(ctx, mailboxStats, mailboxID)
+	var i MailboxStatsRow
+	err := row.Scan(&i.MessageCount, &i.UnreadCount)
+	return i, err
 }
 
 const markAllMessagesRead = `-- name: MarkAllMessagesRead :exec

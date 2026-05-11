@@ -1,29 +1,33 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Login from "./admin/Login";
-import AdminLayout from "./admin/AdminLayout";
-import Mailboxes from "./admin/Mailboxes";
-import MailboxDetail from "./admin/MailboxDetail";
-import MessageDetail from "./admin/MessageDetail";
-import Tokens from "./admin/Tokens";
-import SystemConfig from "./admin/SystemConfig";
-import Viewer from "./viewer/Viewer";
-import ViewerMessage from "./viewer/ViewerMessage";
+
+const Login = lazy(() => import("./admin/Login"));
+const AdminLayout = lazy(() => import("./admin/AdminLayout"));
+const Mailboxes = lazy(() => import("./admin/Mailboxes"));
+const MailboxDetail = lazy(() => import("./admin/MailboxDetail"));
+const MessageDetail = lazy(() => import("./admin/MessageDetail"));
+const Tokens = lazy(() => import("./admin/Tokens"));
+const SystemConfig = lazy(() => import("./admin/SystemConfig"));
+const Viewer = lazy(() => import("./viewer/Viewer"));
+const ViewerMessage = lazy(() => import("./viewer/ViewerMessage"));
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/admin" replace />} />
-      <Route path="/admin/login" element={<Login />} />
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<Mailboxes />} />
-        <Route path="mailboxes/:id" element={<MailboxDetail />} />
-        <Route path="messages/:id" element={<MessageDetail />} />
-        <Route path="tokens" element={<Tokens />} />
-        <Route path="system-config" element={<SystemConfig />} />
-      </Route>
-      <Route path="/v/:token" element={<Viewer />} />
-      <Route path="/v/:token/messages/:id" element={<ViewerMessage />} />
-      <Route path="*" element={<Navigate to="/admin" replace />} />
-    </Routes>
+    <Suspense>
+      <Routes>
+        <Route path="/" element={<Navigate to="/admin" replace />} />
+        <Route path="/admin/login" element={<Login />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<Mailboxes />} />
+          <Route path="mailboxes/:id" element={<MailboxDetail />} />
+          <Route path="messages/:id" element={<MessageDetail />} />
+          <Route path="tokens" element={<Tokens />} />
+          <Route path="system-config" element={<SystemConfig />} />
+        </Route>
+        <Route path="/v/:token" element={<Viewer />} />
+        <Route path="/v/:token/messages/:id" element={<ViewerMessage />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

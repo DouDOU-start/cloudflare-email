@@ -8,3 +8,8 @@ SELECT * FROM attachments WHERE message_id = ? ORDER BY id;
 
 -- name: GetAttachmentByID :one
 SELECT * FROM attachments WHERE id = ? LIMIT 1;
+
+-- name: ListAttachmentPathsByMailbox :many
+SELECT a.storage_path FROM attachments a
+JOIN messages m ON m.id = a.message_id
+WHERE m.mailbox_id = ?;

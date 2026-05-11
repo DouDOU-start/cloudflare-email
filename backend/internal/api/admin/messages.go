@@ -41,17 +41,18 @@ type attachmentView struct {
 
 func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	limit, offset := httpapi.ParsePage(r)
-	params, countParams := messageSearchParams(r, limit, offset)
+	params := messageSearchParams(r, limit, offset)
 
 	rows, err := s.Queries.ListMessages(r.Context(), params)
 	if err != nil {
 		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
 		return
 	}
-	total, _ := s.Queries.CountMessages(r.Context(), countParams)
 
+	var total int64
 	out := make([]messageListItem, 0, len(rows))
 	for _, m := range rows {
+		total = m.TotalCount
 		out = append(out, messageListItem{
 			ID:         m.ID,
 			MailboxID:  m.MailboxID,
@@ -67,14 +68,14 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"items": out, "total": total})
 }
 
-func messageSearchParams(r *http.Request, limit, offset int64) (gen.ListMessagesParams, gen.CountMessagesParams) {
+func messageSearchParams(r *http.Request, limit, offset int64) gen.ListMessagesParams {
 	search := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("q")))
 	pattern := "%" + search + "%"
 	status := r.URL.Query().Get("status")
 	if status != "unread" && status != "read" {
 		status = "all"
 	}
-	count := gen.CountMessagesParams{
+	return gen.ListMessagesParams{
 		Column1:  search,
 		FromAddr: pattern,
 		ToAddr:   pattern,
@@ -84,20 +85,9 @@ func messageSearchParams(r *http.Request, limit, offset int64) (gen.ListMessages
 		Column7:  status,
 		Column8:  status,
 		Column9:  status,
-	}
-	return gen.ListMessagesParams{
-		Column1:  count.Column1,
-		FromAddr: count.FromAddr,
-		ToAddr:   count.ToAddr,
-		Subject:  count.Subject,
-		Address:  count.Address,
-		Note:     count.Note,
-		Column7:  count.Column7,
-		Column8:  count.Column8,
-		Column9:  count.Column9,
 		Limit:    limit,
 		Offset:   offset,
-	}, count
+	}
 }
 
 func (s *Server) handleListMailboxMessages(w http.ResponseWriter, r *http.Request) {
@@ -117,10 +107,11 @@ func (s *Server) handleListMailboxMessages(w http.ResponseWriter, r *http.Reques
 		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
 		return
 	}
-	total, _ := s.Queries.CountMessagesByMailbox(r.Context(), mailboxID)
 
+	var total int64
 	out := make([]messageListItem, 0, len(rows))
 	for _, m := range rows {
+		total = m.TotalCount
 		out = append(out, messageListItem{
 			ID:         m.ID,
 			MailboxID:  m.MailboxID,

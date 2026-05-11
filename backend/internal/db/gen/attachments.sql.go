@@ -62,6 +62,35 @@ func (q *Queries) GetAttachmentByID(ctx context.Context, id int64) (Attachment, 
 	return i, err
 }
 
+const listAttachmentPathsByMailbox = `-- name: ListAttachmentPathsByMailbox :many
+SELECT a.storage_path FROM attachments a
+JOIN messages m ON m.id = a.message_id
+WHERE m.mailbox_id = ?
+`
+
+func (q *Queries) ListAttachmentPathsByMailbox(ctx context.Context, mailboxID int64) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listAttachmentPathsByMailbox, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var storage_path string
+		if err := rows.Scan(&storage_path); err != nil {
+			return nil, err
+		}
+		items = append(items, storage_path)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAttachmentsByMessage = `-- name: ListAttachmentsByMessage :many
 SELECT id, message_id, filename, content_type, size, storage_path FROM attachments WHERE message_id = ? ORDER BY id
 `

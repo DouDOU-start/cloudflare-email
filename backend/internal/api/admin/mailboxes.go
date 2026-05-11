@@ -124,14 +124,16 @@ func (s *Server) handleDeleteMailbox(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusBadRequest, httpapi.Error{Error: "bad id"})
 		return
 	}
-	// Cleanup attachment storage first, then cascade delete.
-	msgs, _ := s.Queries.ListMessagesByMailbox(r.Context(), gen.ListMessagesByMailboxParams{
-		MailboxID: id,
-		Limit:     1000000,
-		Offset:    0,
-	})
-	for _, m := range msgs {
-		s.purgeMessageFiles(r.Context(), m.ID)
+	// Cleanup stored files before cascade delete.
+	attPaths, _ := s.Queries.ListAttachmentPathsByMailbox(r.Context(), id)
+	for _, p := range attPaths {
+		_ = s.Storage.Delete(p)
+	}
+	rawPaths, _ := s.Queries.ListStoragePathsByMailbox(r.Context(), id)
+	for _, p := range rawPaths {
+		if p.Valid {
+			_ = s.Storage.Delete(p.String)
+		}
 	}
 	if err := s.Queries.DeleteMailbox(r.Context(), id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

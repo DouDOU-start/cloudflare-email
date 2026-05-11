@@ -33,8 +33,14 @@ func Handler() http.Handler {
 			if ct := mime.TypeByExtension(path.Ext("index.html")); ct != "" {
 				w.Header().Set("Content-Type", ct)
 			}
+			w.Header().Set("Cache-Control", "no-cache")
 			fileServer.ServeHTTP(w, r2)
 			return
+		}
+		if p != "index.html" && (strings.Contains(p, "assets/") || strings.Contains(p, ".")) {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		fileServer.ServeHTTP(w, r)
 	})

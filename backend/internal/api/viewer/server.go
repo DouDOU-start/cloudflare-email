@@ -131,13 +131,12 @@ func (s *Server) handleMailbox(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
 		return
 	}
-	unread, _ := s.Queries.CountUnreadByMailbox(r.Context(), mailboxID)
-	total, _ := s.Queries.CountMessagesByMailbox(r.Context(), mailboxID)
+	stats, _ := s.Queries.MailboxStats(r.Context(), mailboxID)
 	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 		"address":       mb.Address,
 		"created_at":    mb.CreatedAt,
-		"message_count": total,
-		"unread_count":  unread,
+		"message_count": stats.MessageCount,
+		"unread_count":  stats.UnreadCount,
 	})
 }
 
@@ -153,10 +152,11 @@ func (s *Server) handleListMessages(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteJSON(w, http.StatusInternalServerError, httpapi.Error{Error: "internal error"})
 		return
 	}
-	total, _ := s.Queries.CountMessagesByMailbox(r.Context(), mailboxID)
 
+	var total int64
 	items := make([]map[string]any, 0, len(rows))
 	for _, m := range rows {
+		total = m.TotalCount
 		items = append(items, map[string]any{
 			"id":          m.ID,
 			"from_addr":   m.FromAddr,
