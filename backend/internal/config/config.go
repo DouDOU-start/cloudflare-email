@@ -26,6 +26,8 @@ type Config struct {
 	AdminAPIKey     string
 	TurnstileSite   string
 	TurnstileSecret string
+	RetentionDays   int
+	AutoCleanup     bool
 }
 
 type Store struct {
@@ -50,6 +52,8 @@ type SystemSettings struct {
 	AdminPasswordSet bool           `json:"admin_password_set"`
 	AdminAPIKey      string         `json:"admin_api_key"`
 	Editable         EditableFields `json:"editable"`
+	RetentionDays    int            `json:"retention_days"`
+	AutoCleanup      bool           `json:"auto_cleanup"`
 }
 
 type SystemPatch struct {
@@ -59,6 +63,8 @@ type SystemPatch struct {
 	AdminUsername *string
 	AdminPassword *string
 	AdminAPIKey   *string
+	RetentionDays *int
+	AutoCleanup   *bool
 }
 
 // fileConfig mirrors the YAML schema. Fields are pointers/strings so we can
@@ -79,6 +85,8 @@ type fileConfig struct {
 		SiteKey   string `yaml:"site_key"`
 		SecretKey string `yaml:"secret_key"`
 	} `yaml:"turnstile"`
+	RetentionDays int  `yaml:"retention_days"`
+	AutoCleanup   bool `yaml:"auto_cleanup"`
 }
 
 // Load reads config.yaml (path from CONFIG_PATH, default ./config.yaml).
@@ -113,6 +121,8 @@ func Load() (*Config, error) {
 		AdminAPIKey:     firstNonEmpty(os.Getenv("ADMIN_API_KEY"), fc.AdminAPIKey),
 		TurnstileSite:   firstNonEmpty(os.Getenv("TURNSTILE_SITE_KEY"), fc.Turnstile.SiteKey),
 		TurnstileSecret: firstNonEmpty(os.Getenv("TURNSTILE_SECRET_KEY"), fc.Turnstile.SecretKey),
+		RetentionDays:   fc.RetentionDays,
+		AutoCleanup:     fc.AutoCleanup,
 	}
 
 	if c.IngestToken == "" {
@@ -210,7 +220,7 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if patch.IngestToken == nil && patch.IngestSecret == nil && patch.SessionSecret == nil && patch.AdminUsername == nil && patch.AdminPassword == nil && patch.AdminAPIKey == nil {
+	if patch.IngestToken == nil && patch.IngestSecret == nil && patch.SessionSecret == nil && patch.AdminUsername == nil && patch.AdminPassword == nil && patch.AdminAPIKey == nil && patch.RetentionDays == nil && patch.AutoCleanup == nil {
 		return systemSettingsFromConfig(s.cfg), nil
 	}
 	if err := validatePatch(patch); err != nil {
@@ -249,6 +259,12 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	if patch.AdminAPIKey != nil {
 		fc.AdminAPIKey = strings.TrimSpace(*patch.AdminAPIKey)
 	}
+	if patch.RetentionDays != nil {
+		fc.RetentionDays = *patch.RetentionDays
+	}
+	if patch.AutoCleanup != nil {
+		fc.AutoCleanup = *patch.AutoCleanup
+	}
 
 	updated := s.cfg
 	updated.IngestToken = firstNonEmpty(os.Getenv("INGEST_TOKEN"), fc.IngestToken)
@@ -257,6 +273,8 @@ func (s *Store) UpdateSystemSettings(patch SystemPatch) (SystemSettings, error) 
 	updated.AdminUsername = firstNonEmpty(os.Getenv("ADMIN_USERNAME"), fc.Admin.Username)
 	updated.AdminPassword = firstNonEmpty(os.Getenv("ADMIN_PASSWORD"), fc.Admin.Password)
 	updated.AdminAPIKey = firstNonEmpty(os.Getenv("ADMIN_API_KEY"), fc.AdminAPIKey)
+	updated.RetentionDays = fc.RetentionDays
+	updated.AutoCleanup = fc.AutoCleanup
 	if updated.IngestToken == "" || updated.IngestSecret == "" || updated.SessionSecret == "" || updated.AdminUsername == "" || updated.AdminPassword == "" {
 		return SystemSettings{}, fmt.Errorf("system config fields must not be empty")
 	}
@@ -289,6 +307,8 @@ func systemSettingsFromConfig(cfg Config) SystemSettings {
 			AdminPassword: os.Getenv("ADMIN_PASSWORD") == "",
 			AdminAPIKey:   os.Getenv("ADMIN_API_KEY") == "",
 		},
+		RetentionDays: cfg.RetentionDays,
+		AutoCleanup:   cfg.AutoCleanup,
 	}
 }
 

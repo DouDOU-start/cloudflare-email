@@ -110,6 +110,8 @@ export interface SystemConfig {
     admin_password: boolean;
     admin_api_key: boolean;
   };
+  retention_days: number;
+  auto_cleanup: boolean;
 }
 
 export interface Paged<T> {

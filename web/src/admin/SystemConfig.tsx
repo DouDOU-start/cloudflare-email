@@ -10,6 +10,8 @@ type UpdateSystemConfig = {
   admin_username?: string;
   admin_password?: string;
   admin_api_key?: string;
+  retention_days?: number;
+  auto_cleanup?: boolean;
 };
 
 export default function SystemConfig() {
@@ -25,11 +27,14 @@ export default function SystemConfig() {
   const [adminUsername, setAdminUsername] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [adminAPIKey, setAdminAPIKey] = useState("");
+  const [retentionDays, setRetentionDays] = useState(0);
+  const [autoCleanup, setAutoCleanup] = useState(false);
   const [showIngestToken, setShowIngestToken] = useState(false);
   const [copiedIngestToken, setCopiedIngestToken] = useState(false);
   const [showAdminAPIKey, setShowAdminAPIKey] = useState(false);
   const [copiedAdminAPIKey, setCopiedAdminAPIKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<string | null>(null);
 
   useEffect(() => {
     if (!config.data) return;
@@ -39,6 +44,8 @@ export default function SystemConfig() {
     setAdminUsername(config.data.admin_username);
     setAdminPassword("");
     setAdminAPIKey(config.data.admin_api_key);
+    setRetentionDays(config.data.retention_days);
+    setAutoCleanup(config.data.auto_cleanup);
   }, [config.data]);
 
   const update = useMutation({
@@ -62,7 +69,9 @@ export default function SystemConfig() {
       (current.editable.session_secret && !!sessionSecret) ||
       (current.editable.admin_username && adminUsername !== current.admin_username) ||
       (current.editable.admin_password && !!adminPassword) ||
-      (current.editable.admin_api_key && adminAPIKey !== current.admin_api_key));
+      (current.editable.admin_api_key && adminAPIKey !== current.admin_api_key) ||
+      retentionDays !== current.retention_days ||
+      autoCleanup !== current.auto_cleanup);
   const canSave = !!current && !isBusy && hasChanges;
   const editableCount = current ? Object.values(current.editable).filter(Boolean).length : 0;
 
@@ -77,6 +86,8 @@ export default function SystemConfig() {
     if (current.editable.admin_username && adminUsername !== current.admin_username) body.admin_username = adminUsername;
     if (current.editable.admin_password && adminPassword) body.admin_password = adminPassword;
     if (current.editable.admin_api_key && adminAPIKey !== current.admin_api_key) body.admin_api_key = adminAPIKey;
+    if (retentionDays !== current.retention_days) body.retention_days = retentionDays;
+    if (autoCleanup !== current.auto_cleanup) body.auto_cleanup = autoCleanup;
 
     update.mutate(body);
   }
@@ -89,6 +100,8 @@ export default function SystemConfig() {
     setAdminUsername(current.admin_username);
     setAdminPassword("");
     setAdminAPIKey(current.admin_api_key);
+    setRetentionDays(current.retention_days);
+    setAutoCleanup(current.auto_cleanup);
     setShowIngestToken(false);
     setCopiedIngestToken(false);
     setShowAdminAPIKey(false);
@@ -101,6 +114,15 @@ export default function SystemConfig() {
     await navigator.clipboard.writeText(ingestToken);
     setCopiedIngestToken(true);
   }
+
+  const manualCleanup = useMutation({
+    mutationFn: (days: number) => api.post<{ deleted: number }>("/api/admin/messages/cleanup", { days }),
+    onSuccess: (data) => {
+      setCleanupResult(`已清理 ${data.deleted} 封邮件`);
+      qc.invalidateQueries({ queryKey: ["mailboxes"] });
+      qc.invalidateQueries({ queryKey: ["messages"] });
+    },
+  });
 
   async function copyAdminAPIKey() {
     if (!adminAPIKey) return;
@@ -239,6 +261,61 @@ export default function SystemConfig() {
               autoComplete="new-password"
             />
           </PlainConfigField>
+        </div>
+      </Panel>
+
+      <Panel className="shrink-0 p-4 md:p-5" accent>
+        <div className="mb-3 font-mono-display text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">邮件保留策略</div>
+        <div className="grid gap-x-5 gap-y-3 xl:grid-cols-2">
+          <div className="border-2 border-hairline/80 bg-card/60 p-3 shadow-inset">
+            <div className="mb-2 font-mono-display text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">保留天数</div>
+            <Input
+              type="number"
+              min={0}
+              value={retentionDays}
+              onChange={(e) => {
+                setRetentionDays(Math.max(0, parseInt(e.target.value) || 0));
+                setSaved(false);
+              }}
+              disabled={isBusy}
+            />
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">超过此天数的邮件将被清理。设为 0 表示永久保留。</p>
+          </div>
+          <div className="border-2 border-hairline/80 bg-card/60 p-3 shadow-inset">
+            <div className="mb-2 font-mono-display text-[11px] font-bold uppercase tracking-[0.14em] text-foreground">自动清理</div>
+            <div className="flex items-center gap-3">
+              <label className="relative inline-flex cursor-pointer items-center">
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={autoCleanup}
+                  onChange={(e) => {
+                    setAutoCleanup(e.target.checked);
+                    setSaved(false);
+                  }}
+                  disabled={isBusy}
+                />
+                <div className="h-6 w-11 rounded-full border-2 border-hairline bg-surface-elevated after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-hairline after:bg-foreground after:transition-all peer-checked:border-accent peer-checked:bg-accent peer-checked:after:translate-x-full peer-disabled:cursor-not-allowed peer-disabled:opacity-50" />
+              </label>
+              <Badge tone={autoCleanup ? "success" : "outline"}>{autoCleanup ? "已开启" : "未开启"}</Badge>
+            </div>
+            <p className="mt-1.5 text-xs leading-5 text-muted-foreground">开启后系统每小时自动清理过期邮件。需要同时设置保留天数。</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={retentionDays <= 0 || manualCleanup.isPending || isBusy}
+            onClick={() => manualCleanup.mutate(retentionDays)}
+          >
+            {manualCleanup.isPending ? "清理中..." : "立即清理"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {retentionDays > 0 ? `将删除 ${retentionDays} 天前的邮件` : "请先设置保留天数"}
+          </span>
+          {cleanupResult && <Badge tone="success">{cleanupResult}</Badge>}
+          {manualCleanup.error && <Badge tone="danger">{errorMessage(manualCleanup.error)}</Badge>}
         </div>
       </Panel>
     </div>

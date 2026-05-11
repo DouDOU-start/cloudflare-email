@@ -68,5 +68,12 @@ LIMIT ?;
 SELECT raw_storage_path FROM messages
 WHERE mailbox_id = ? AND raw_storage_path IS NOT NULL AND raw_storage_path != '';
 
+-- name: ListStoragePathsOlderThan :many
+SELECT raw_storage_path FROM messages
+WHERE received_at < ? AND raw_storage_path IS NOT NULL AND raw_storage_path != '';
+
+-- name: DeleteMessagesOlderThan :execresult
+DELETE FROM messages WHERE received_at < ?;
+
 -- name: DeleteMessage :exec
 DELETE FROM messages WHERE id = ?;

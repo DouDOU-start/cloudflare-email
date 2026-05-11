@@ -78,6 +78,7 @@ func (s *Server) Routes() http.Handler {
 		r.Get("/messages/{id}/eml", s.handleDownloadMessageEML)
 		r.Post("/messages/{id}/read", s.handleMarkRead)
 		r.Delete("/messages/{id}", s.handleDeleteMessage)
+		r.Post("/messages/cleanup", s.handleCleanup)
 		r.Get("/attachments/{id}", s.handleDownloadAttachment)
 
 		r.Get("/tokens", s.handleListTokens)

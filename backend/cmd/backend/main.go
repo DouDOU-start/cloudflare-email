@@ -13,6 +13,7 @@ import (
 	adminapi "github.com/cf-email/backend/internal/api/admin"
 	codeapi "github.com/cf-email/backend/internal/api/code"
 	viewerapi "github.com/cf-email/backend/internal/api/viewer"
+	"github.com/cf-email/backend/internal/cleanup"
 	"github.com/cf-email/backend/internal/config"
 	"github.com/cf-email/backend/internal/db"
 	"github.com/cf-email/backend/internal/ingest"
@@ -69,6 +70,14 @@ func main() {
 		TurnstileSite:  cfg.TurnstileSite,
 		CookieInsecure: os.Getenv("DEV_INSECURE_COOKIE") == "1",
 	}
+
+	cleaner := &cleanup.Worker{
+		Config:  cfgStore,
+		Queries: queries,
+		Storage: store,
+		Logger:  logger,
+	}
+	go cleaner.Run(rootCtx)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

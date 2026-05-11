@@ -93,6 +93,14 @@ func (q *Queries) DeleteMessage(ctx context.Context, id int64) error {
 	return err
 }
 
+const deleteMessagesOlderThan = `-- name: DeleteMessagesOlderThan :execresult
+DELETE FROM messages WHERE received_at < ?
+`
+
+func (q *Queries) DeleteMessagesOlderThan(ctx context.Context, receivedAt int64) (sql.Result, error) {
+	return q.db.ExecContext(ctx, deleteMessagesOlderThan, receivedAt)
+}
+
 const findLatestUnreadMessagesForCode = `-- name: FindLatestUnreadMessagesForCode :many
 SELECT
     id, mailbox_id, message_id, from_addr, to_addr, subject,
@@ -330,6 +338,34 @@ WHERE mailbox_id = ? AND raw_storage_path IS NOT NULL AND raw_storage_path != ''
 
 func (q *Queries) ListStoragePathsByMailbox(ctx context.Context, mailboxID int64) ([]sql.NullString, error) {
 	rows, err := q.db.QueryContext(ctx, listStoragePathsByMailbox, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []sql.NullString{}
+	for rows.Next() {
+		var raw_storage_path sql.NullString
+		if err := rows.Scan(&raw_storage_path); err != nil {
+			return nil, err
+		}
+		items = append(items, raw_storage_path)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStoragePathsOlderThan = `-- name: ListStoragePathsOlderThan :many
+SELECT raw_storage_path FROM messages
+WHERE received_at < ? AND raw_storage_path IS NOT NULL AND raw_storage_path != ''
+`
+
+func (q *Queries) ListStoragePathsOlderThan(ctx context.Context, receivedAt int64) ([]sql.NullString, error) {
+	rows, err := q.db.QueryContext(ctx, listStoragePathsOlderThan, receivedAt)
 	if err != nil {
 		return nil, err
 	}

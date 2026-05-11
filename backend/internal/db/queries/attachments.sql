@@ -13,3 +13,8 @@ SELECT * FROM attachments WHERE id = ? LIMIT 1;
 SELECT a.storage_path FROM attachments a
 JOIN messages m ON m.id = a.message_id
 WHERE m.mailbox_id = ?;
+
+-- name: ListAttachmentPathsOlderThan :many
+SELECT a.storage_path FROM attachments a
+JOIN messages m ON m.id = a.message_id
+WHERE m.received_at < ?;
